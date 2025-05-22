@@ -7,6 +7,12 @@ set -e
 
 echo "🚀 Starting Wheel of Life deployment..."
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_ROOT="$SCRIPT_DIR"
+cd "$PROJECT_ROOT"
+
+echo "📁 Project root: $PROJECT_ROOT"
+
 # Colors for output
 RED='\033[0;31m'
 GREEN='\033[0;32m'
@@ -90,6 +96,12 @@ if ! id "wheelapp" &>/dev/null; then
     usermod -aG sudo wheelapp
 fi
 
+# Verify deployment scripts exist
+if [ ! -d "deployment/scripts" ]; then
+    print_error "Deployment scripts directory not found: deployment/scripts"
+    exit 1
+fi
+
 # Run individual deployment scripts
 chmod +x deployment/scripts/*.sh
 
@@ -106,11 +118,15 @@ print_status "Setting up SSL..."
 ./deployment/scripts/setup-ssl.sh "$DOMAIN"
 
 print_status "Setting up monitoring and backups..."
-cp deployment/scripts/backup.sh /usr/local/bin/backup-wheeloflife.sh
-chmod +x /usr/local/bin/backup-wheeloflife.sh
-
-# Add backup to crontab
-(crontab -l 2>/dev/null; echo "0 2 * * * /usr/local/bin/backup-wheeloflife.sh") | crontab -
+if [ -f "deployment/scripts/backup.sh" ]; then
+    cp deployment/scripts/backup.sh /usr/local/bin/backup-wheeloflife.sh
+    chmod +x /usr/local/bin/backup-wheeloflife.sh
+    
+    # Add backup to crontab
+    (crontab -l 2>/dev/null; echo "0 2 * * * /usr/local/bin/backup-wheeloflife.sh") | crontab -
+else
+    print_warning "Backup script not found, skipping backup setup"
+fi
 
 print_status "🎉 Deployment completed successfully!"
 echo
