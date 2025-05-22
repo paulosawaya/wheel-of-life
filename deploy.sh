@@ -32,19 +32,51 @@ if [[ $EUID -ne 0 ]]; then
    exit 1
 fi
 
-# Get domain from user
-read -p "Enter your domain (default: wol.com): " DOMAIN
-DOMAIN=${DOMAIN:-wol.com}
+# IMPROVEMENT: Load configuration from file or environment
+CONFIG_FILE="deployment/.env.deploy"
+if [ -f "$CONFIG_FILE" ]; then
+    print_status "Loading configuration from $CONFIG_FILE"
+    source "$CONFIG_FILE"
+fi
 
-# Get database password
-read -s -p "Enter MySQL password for wheelapp user: " DB_PASSWORD
+# Get configuration with defaults
+read -p "Enter your domain (default: ${DOMAIN:-wol.com}): " INPUT_DOMAIN
+DOMAIN=${INPUT_DOMAIN:-${DOMAIN:-wol.com}}
+
+read -s -p "Enter MySQL password for wheelapp user (default: generate random): " INPUT_DB_PASSWORD
 echo
+DB_PASSWORD=${INPUT_DB_PASSWORD:-${DB_PASSWORD:-$(openssl rand -base64 32)}}
 
-# Get JWT secret
-read -s -p "Enter JWT secret key (32+ characters): " JWT_SECRET
+read -s -p "Enter JWT secret key (default: generate random): " INPUT_JWT_SECRET
 echo
+JWT_SECRET=${INPUT_JWT_SECRET:-${JWT_SECRET:-$(openssl rand -base64 48)}}
 
+# IMPROVEMENT: Save configuration for future deployments
+mkdir -p deployment
+cat > deployment/.env.deploy << EOF
+# Deployment Configuration
+# Generated on $(date)
+DOMAIN=$DOMAIN
+DB_PASSWORD=$DB_PASSWORD
+JWT_SECRET=$JWT_SECRET
+EOF
+
+chmod 600 deployment/.env.deploy
+
+print_status "Configuration:"
 print_status "Domain: $DOMAIN"
+print_status "Database password: [HIDDEN]"
+print_status "JWT secret: [HIDDEN]"
+print_status "Config saved to: deployment/.env.deploy"
+
+# Confirm before proceeding
+read -p "Proceed with deployment? (y/N): " -n 1 -r
+echo
+if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+    print_warning "Deployment cancelled"
+    exit 1
+fi
+
 print_status "Starting automated deployment..."
 
 # Update system
@@ -86,12 +118,16 @@ echo "Your Wheel of Life application is now available at:"
 echo "🌐 https://$DOMAIN"
 echo "🔗 API: https://$DOMAIN/api"
 echo
+echo "Configuration saved to: deployment/.env.deploy"
+echo "Database password: $DB_PASSWORD"
+echo "JWT secret: $JWT_SECRET"
+echo
 echo "Next steps:"
 echo "1. Test the application: curl https://$DOMAIN/api/life-areas"
 echo "2. Check logs: sudo journalctl -u wheeloflife -f"
 echo "3. Monitor status: sudo systemctl status wheeloflife"
 echo
 print_warning "Don't forget to:"
-print_warning "- Keep your passwords secure"
+print_warning "- Keep your deployment/.env.deploy file secure"
 print_warning "- Set up monitoring alerts"
 print_warning "- Test backups regularly"
