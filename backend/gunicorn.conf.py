@@ -1,0 +1,12 @@
+bind = "127.0.0.1:5000"
+workers = 4
+worker_class = "sync"
+timeout = 120
+max_requests = 1000
+max_requests_jitter = 50
+user = "wheelapp"
+group = "wheelapp"
+tmp_upload_dir = None
+errorlog = "/var/log/wheeloflife/gunicorn_error.log"
+accesslog = "/var/log/wheeloflife/gunicorn_access.log"
+loglevel = "info"

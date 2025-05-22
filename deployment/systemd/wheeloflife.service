@@ -1,0 +1,18 @@
+[Unit]
+Description=Wheel of Life Flask Application
+After=network.target mysql.service
+Requires=mysql.service
+
+[Service]
+Type=exec
+User=wheelapp
+Group=wheelapp
+WorkingDirectory=/var/www/wheeloflife/backend
+Environment=PATH=/var/www/wheeloflife/venv/bin
+ExecStart=/var/www/wheeloflife/venv/bin/gunicorn --config gunicorn.conf.py app:app
+ExecReload=/bin/kill -s HUP $MAINPID
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
