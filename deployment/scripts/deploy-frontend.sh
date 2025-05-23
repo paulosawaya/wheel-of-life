@@ -91,7 +91,7 @@ if [ -f "$APACHE_CONF_TEMPLATE" ]; then
     # Export the DOMAIN variable so envsubst can use it.
     # The template file (apache.conf.template) should use ${DOMAIN} as the placeholder.
     export DOMAIN 
-    sudo DOMAIN="$DOMAIN" sh -c 'envsubst "\${DOMAIN}" < "$APACHE_CONF_TEMPLATE" > "$APACHE_SITE_CONF"'
+    sudo APACHE_CONF_TEMPLATE="$APACHE_CONF_TEMPLATE" APACHE_SITE_CONF="$APACHE_SITE_CONF" DOMAIN="$DOMAIN" sh -c 'envsubst "\${DOMAIN}" < "$APACHE_CONF_TEMPLATE" > "$APACHE_SITE_CONF"'
     # Unset DOMAIN if it's important to remove it from the environment after this command.
     # For this script, it's likely fine as $DOMAIN is a script parameter.
     # unset DOMAIN
