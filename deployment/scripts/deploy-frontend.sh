@@ -75,15 +75,10 @@ ENVEOF
 # Ensure wheelapp owns the .env file it might read or modify (though usually just read by build).
 sudo chown wheelapp:wheelapp .env
 
-print_status "Installing npm dependencies as user 'wheelapp' using 'npm ci'..."
-# 'npm ci' is preferred for deployment for faster, more reliable builds from package-lock.json.
-# This command requires package-lock.json to be present and consistent with package.json.
-# If package-lock.json is missing or problematic, 'npm install' should be used first
-# (possibly manually one time) to generate/fix it, and then package-lock.json committed to Git.
-sudo -u wheelapp npm ci
-# If 'npm ci' fails due to missing package-lock.json, use 'npm install' instead for the first run:
-# print_warning "npm ci failed, attempting npm install. Ensure package-lock.json is in your repository for future 'npm ci' use."
-# sudo -u wheelapp npm install
+print_status "Installing npm dependencies as user 'wheelapp' using 'npm install'..."
+# Using npm install to resolve potential inconsistencies between package.json and package-lock.json
+sudo -u wheelapp npm install
+# If issues persist, ensure package.json specifies the correct typescript version and node_modules is deleted before install.
 
 
 print_status "Building React application as user 'wheelapp' with PUBLIC_URL=https://$DOMAIN..."
