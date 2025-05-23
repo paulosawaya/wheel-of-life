@@ -11,6 +11,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$SCRIPT_DIR"
 cd "$PROJECT_ROOT"
 
+
 echo "📁 Project root: $PROJECT_ROOT"
 
 # Colors for output
@@ -34,8 +35,8 @@ print_error() {
 
 # Check if running as root
 if [[ $EUID -ne 0 ]]; then
-   print_error "This script must be run as root (use sudo)"
-   exit 1
+    print_error "This script must be run as root (use sudo)"
+    exit 1
 fi
 
 # IMPROVEMENT: Load configuration from file or environment

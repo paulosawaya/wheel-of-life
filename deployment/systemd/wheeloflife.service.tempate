@@ -1,0 +1,50 @@
+<VirtualHost *:80>
+    ServerName ${DOMAIN}
+    ServerAlias www.${DOMAIN}
+    DocumentRoot /var/www/html/wheeloflife
+
+    RewriteEngine On
+    RewriteCond %{HTTPS} off
+    RewriteRule ^(.*)$ https://%{HTTP_HOST}%{REQUEST_URI} [R=301,L]
+</VirtualHost>
+
+<VirtualHost *:443>
+    ServerName ${DOMAIN}
+    ServerAlias www.${DOMAIN}
+    DocumentRoot /var/www/html/wheeloflife
+
+    SSLEngine on
+
+    # Security headers
+    Header always set X-Content-Type-Options nosniff
+    Header always set X-Frame-Options DENY
+    Header always set X-XSS-Protection "1; mode=block"
+    Header always set Strict-Transport-Security "max-age=63072000; includeSubDomains; preload"
+    Header always set Referrer-Policy strict-origin-when-cross-origin
+
+    # API Proxy
+    ProxyPreserveHost On
+    ProxyRequests Off
+    ProxyPass /api/ http://127.0.0.1:5000/api/
+    ProxyPassReverse /api/ http://127.0.0.1:5000/api/
+
+    <Directory /var/www/html/wheeloflife>
+        Options -Indexes
+        AllowOverride All
+        Require all granted
+        
+        RewriteEngine On
+        RewriteBase /
+        RewriteRule ^index\.html$ - [L]
+        RewriteCond %{REQUEST_FILENAME} !-f
+        RewriteCond %{REQUEST_FILENAME} !-d
+        RewriteRule . /index.html [L]
+    </Directory>
+
+    <Files ".env">
+        Require all denied
+    </Files>
+
+    ErrorLog ${APACHE_LOG_DIR}/wheeloflife_error.log
+    CustomLog ${APACHE_LOG_DIR}/wheeloflife_access.log combined
+</VirtualHost>
