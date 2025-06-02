@@ -473,7 +473,7 @@ def get_assessment_results(assessment_id):
     if not assessment:
         return jsonify({'message': 'Assessment não encontrado'}), 404
     
-    # Get area scores
+    # Get area scores with colors
     area_scores = db.session.query(AreaScore, LifeArea).join(LifeArea).filter(
         AreaScore.assessment_id == assessment_id
     ).all()
@@ -481,7 +481,7 @@ def get_assessment_results(assessment_id):
     area_results = [{
         'life_area_id': score.life_area_id,
         'life_area_name': area.name,
-        'color': area.color,
+        'color': area.color or '#999',  # Default color if none set
         'average_score': float(score.average_score),
         'percentage': float(score.percentage)
     } for score, area in area_scores]
@@ -502,6 +502,9 @@ def get_assessment_results(assessment_id):
         'percentage': float(score.percentage)
     } for score, subcategory, area in subcategory_scores]
     
+    # Legacy format for backward compatibility
+    results = area_results
+    
     return jsonify({
         'assessment': {
             'id': assessment.id,
@@ -510,7 +513,8 @@ def get_assessment_results(assessment_id):
             'completed_at': assessment.completed_at.isoformat() if assessment.completed_at else None
         },
         'area_results': area_results,
-        'subcategory_results': subcategory_results
+        'subcategory_results': subcategory_results,
+        'results': results  # Legacy format
     })
 
 @app.route('/api/assessments/<int:assessment_id>/action-plan', methods=['POST'])
