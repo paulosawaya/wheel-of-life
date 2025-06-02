@@ -142,7 +142,11 @@ const HomePage = () => {
       </Header>
 
       <ContentCard>
-        <WheelDiagram />
+        <WheelDiagram 
+          size={350}
+          interactive={false}
+          showPercentages={false}
+         />
         
         <Question>
           Você está pronta(o) para entender como estão 
