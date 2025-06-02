@@ -5,7 +5,7 @@ import { useForm } from 'react-hook-form';
 import styled from 'styled-components';
 import api from '../services/api';
 import toast from 'react-hot-toast';
-import WheelDiagram from '../components/WheelDiagram';
+import WheelDiagram, { processAreaResults } from '../components/WheelDiagram';
 
 const Container = styled.div`
   min-height: 100vh;
