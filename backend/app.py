@@ -216,7 +216,7 @@ def register():
         
         logger.info(f"New user registered: {user.email}")
         
-        access_token = create_access_token(identity=user.id)
+        access_token = create_access_token(identity=str(user.id))
         return jsonify({
             'access_token': access_token,
             'user': {
@@ -245,7 +245,7 @@ def login():
     
     # SECURITY IMPROVEMENT: Use bcrypt for password verification
     if user and bcrypt.checkpw(data['password'].encode('utf-8'), user.password_hash.encode('utf-8')):
-        access_token = create_access_token(identity=user.id)
+        access_token = create_access_token(identity=str(user.id))
         logger.info(f"Successful login: {user.email}")
         return jsonify({
             'access_token': access_token,
