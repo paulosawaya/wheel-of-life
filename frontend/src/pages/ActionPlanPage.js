@@ -5,7 +5,7 @@ import { useForm } from 'react-hook-form';
 import styled from 'styled-components';
 import api from '../services/api';
 import toast from 'react-hot-toast';
-import WheelDiagram from '../components/WheelDiagram';
+import WheelDiagram, { processAreaResults } from '../components/WheelDiagram';
 
 const Container = styled.div`
   min-height: 100vh;
@@ -158,6 +158,15 @@ const DiagramContainer = styled.div`
   }
 `;
 
+const InlineDiagramContainer = styled.div`
+  flex: 0 0 250px;
+
+  @media (min-width: 1201px) {
+    display: none;
+  }
+`;
+
+
 const ActionPlanPage = () => {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -166,30 +175,24 @@ const ActionPlanPage = () => {
   const [lifeAreas, setLifeAreas] = useState([]);
   const [selectedArea, setSelectedArea] = useState('');
   const [results, setResults] = useState([]);
-  const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    const loadData = async () => {
-      setIsLoading(true);
-      try {
-        const [areasResponse, resultsResponse] = await Promise.all([
-          api.get('/life-areas'),
-          api.get(`/assessments/${id}/results`),
-        ]);
-        
-        setLifeAreas(areasResponse.data);
-        // Ensure you use area_results and default to an empty array
-        setResults(resultsResponse.data.area_results || []);
-      } catch (error) {
-        toast.error('Erro ao carregar dados do plano de ação');
-        setResults([]); // Set to empty array on error to prevent crashes
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
     loadData();
   }, [id]);
+
+  const loadData = async () => {
+    try {
+      const [areasResponse, resultsResponse] = await Promise.all([
+        api.get('/life-areas'),
+        api.get(`/assessments/${id}/results`)
+      ]);
+      
+      setLifeAreas(areasResponse.data);
+      setResults(resultsResponse.data.results);
+    } catch (error) {
+      toast.error('Erro ao carregar dados');
+    }
+  };
 
   const handleAreaSelect = () => {
     if (!selectedArea) {
@@ -204,18 +207,18 @@ const ActionPlanPage = () => {
       {
         action_text: data.action1,
         strategy_text: data.strategy1,
-        target_date: data.date1,
+        target_date: data.date1
       },
       {
         action_text: data.action2,
         strategy_text: data.strategy2,
-        target_date: data.date2,
+        target_date: data.date2
       },
       {
         action_text: data.action3,
         strategy_text: data.strategy3,
-        target_date: data.date3,
-      },
+        target_date: data.date3
+      }
     ].filter(action => action.action_text && action.strategy_text);
 
     if (actions.length === 0) {
@@ -226,7 +229,7 @@ const ActionPlanPage = () => {
     try {
       await api.post(`/assessments/${id}/action-plan`, {
         focus_area_id: parseInt(selectedArea),
-        actions,
+        actions
       });
 
       toast.success('Plano de ação criado com sucesso!');
@@ -235,20 +238,12 @@ const ActionPlanPage = () => {
       toast.error('Erro ao criar plano de ação');
     }
   };
-  
-  // Correctly structure the data for the WheelDiagram component
-  const wheelData = {
-    areas: Array.isArray(results) ? results.map(result => ({
-      name: result.life_area_name,
-      color: result.color,
-      score: result.average_score, // Pass the score for consistency
-      percentage: result.percentage
-    })) : []
-  };
 
-  if (isLoading) {
-    return <Container><div>Carregando...</div></Container>;
-  }
+  const wheelData = results.map(result => ({
+    name: result.life_area_name,
+    color: result.color,
+    percentage: result.percentage
+  }));
 
   if (step === 1) {
     return (
@@ -289,9 +284,9 @@ const ActionPlanPage = () => {
               </SubmitButton>
             </div>
             
-            <div style={{ flex: '0 0 250px' }}>
+            <InlineDiagramContainer>
               <WheelDiagram data={wheelData} />
-            </div>
+            </InlineDiagramContainer>
           </div>
         </ContentCard>
 
