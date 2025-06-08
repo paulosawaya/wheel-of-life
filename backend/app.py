@@ -128,10 +128,10 @@ class Assessment(db.Model):
     user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
     title = db.Column(db.String(255), default='Avaliação da Roda da Vida')
     status = db.Column(db.Enum('in_progress', 'completed'), default='in_progress')
+    current_area_index = db.Column(db.Integer, default=0)
     started_at = db.Column(db.DateTime, default=datetime.utcnow)
     completed_at = db.Column(db.DateTime)
     user = db.relationship('User', backref='assessments')
-
 class Response(db.Model):
     __tablename__ = 'responses'
     id = db.Column(db.Integer, primary_key=True)
@@ -289,6 +289,117 @@ def get_subcategory_questions(subcategory_id):
         'question_text': q.question_text,
         'question_order': q.question_order
     } for q in questions])
+
+@app.route('/api/user/assessments', methods=['GET'])
+@jwt_required()
+def get_user_assessments():
+    user_id = get_jwt_identity()
+    
+    assessments = Assessment.query.filter_by(user_id=user_id).order_by(Assessment.started_at.desc()).all()
+    
+    assessment_list = []
+    for assessment in assessments:
+        # Count total responses for this assessment
+        response_count = Response.query.filter_by(assessment_id=assessment.id).count()
+        
+        # Get area scores if completed
+        area_scores = []
+        if assessment.status == 'completed':
+            scores = db.session.query(AreaScore, LifeArea).join(LifeArea).filter(
+                AreaScore.assessment_id == assessment.id
+            ).all()
+            area_scores = [{
+                'area_name': area.name,
+                'score': float(score.average_score),
+                'percentage': float(score.percentage)
+            } for score, area in scores]
+        
+        assessment_list.append({
+            'id': assessment.id,
+            'title': assessment.title,
+            'status': assessment.status,
+            'current_area_index': assessment.current_area_index,
+            'started_at': assessment.started_at.isoformat(),
+            'completed_at': assessment.completed_at.isoformat() if assessment.completed_at else None,
+            'response_count': response_count,
+            'area_scores': area_scores
+        })
+    
+    return jsonify({'assessments': assessment_list})
+
+@app.route('/api/assessments/<int:assessment_id>/progress', methods=['GET'])
+@jwt_required()
+def get_assessment_progress(assessment_id):
+    user_id = get_jwt_identity()
+    
+    assessment = Assessment.query.filter_by(id=assessment_id, user_id=user_id).first()
+    if not assessment:
+        return jsonify({'error': 'Avaliação não encontrada'}), 404
+    
+    # Get all answered questions
+    responses = Response.query.filter_by(assessment_id=assessment_id).all()
+    answered_questions = {r.question_id: r.score for r in responses}
+    
+    return jsonify({
+        'assessment': {
+            'id': assessment.id,
+            'status': assessment.status,
+            'current_area_index': assessment.current_area_index,
+            'started_at': assessment.started_at.isoformat(),
+        },
+        'answered_questions': answered_questions
+    })
+
+@app.route('/api/assessments/<int:assessment_id>/update-progress', methods=['POST'])
+@jwt_required()
+def update_assessment_progress(assessment_id):
+    user_id = get_jwt_identity()
+    data = request.get_json()
+    
+    assessment = Assessment.query.filter_by(id=assessment_id, user_id=user_id).first()
+    if not assessment:
+        return jsonify({'error': 'Avaliação não encontrada'}), 404
+    
+    if 'current_area_index' in data:
+        assessment.current_area_index = data['current_area_index']
+        db.session.commit()
+    
+    return jsonify({'message': 'Progresso atualizado'})
+
+@app.route('/api/assessments/continue-or-create', methods=['POST'])
+@jwt_required()
+def continue_or_create_assessment():
+    user_id = get_jwt_identity()
+    
+    # Check for in-progress assessment
+    in_progress = Assessment.query.filter_by(
+        user_id=user_id, 
+        status='in_progress'
+    ).order_by(Assessment.started_at.desc()).first()
+    
+    if in_progress:
+        return jsonify({
+            'id': in_progress.id,
+            'title': in_progress.title,
+            'status': in_progress.status,
+            'current_area_index': in_progress.current_area_index,
+            'started_at': in_progress.started_at.isoformat(),
+            'is_continuation': True
+        })
+    
+    # Create new assessment
+    assessment = Assessment(user_id=user_id)
+    db.session.add(assessment)
+    db.session.commit()
+    
+    return jsonify({
+        'id': assessment.id,
+        'title': assessment.title,
+        'status': assessment.status,
+        'current_area_index': 0,
+        'started_at': assessment.started_at.isoformat(),
+        'is_continuation': False
+    }), 201
 
 @app.route('/api/assessments', methods=['POST'])
 @jwt_required()

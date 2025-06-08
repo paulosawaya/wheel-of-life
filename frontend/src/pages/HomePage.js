@@ -65,6 +65,13 @@ const TipsList = styled.ol`
   line-height: 1.8;
 `;
 
+const ButtonContainer = styled.div`
+  display: flex;
+  gap: 1rem;
+  justify-content: center;
+  margin-top: 2rem;
+`;
+
 const StartButton = styled.button`
   background: #4ECDC4;
   color: white;
@@ -78,6 +85,14 @@ const StartButton = styled.button`
 
   &:hover {
     background: #45b7b8;
+  }
+`;
+
+const DashboardButton = styled(StartButton)`
+  background: #9b59b6;
+  
+  &:hover {
+    background: #8e44ad;
   }
 `;
 
@@ -115,19 +130,35 @@ const HomePage = () => {
     }
 
     try {
-      const response = await api.post('/assessments');
+      const response = await api.post('/assessments/continue-or-create');
       const assessmentId = response.data.id;
+      
+      if (response.data.is_continuation) {
+        toast.success('Continuando avaliação anterior');
+      }
+      
       navigate(`/assessment/${assessmentId}`);
     } catch (error) {
       toast.error('Erro ao iniciar avaliação');
     }
   };
 
+  const goToDashboard = () => {
+    if (!isAuthenticated) {
+      navigate('/login');
+      return;
+    }
+    navigate('/dashboard');
+  };
+
   return (
     <Container>
       <AuthSection>
         {isAuthenticated ? (
-          <AuthButton onClick={logout}>Sair</AuthButton>
+          <>
+            <AuthButton onClick={goToDashboard}>Minhas Avaliações</AuthButton>
+            <AuthButton onClick={logout}>Sair</AuthButton>
+          </>
         ) : (
           <>
             <AuthButton onClick={() => navigate('/login')}>Entrar</AuthButton>
@@ -146,7 +177,7 @@ const HomePage = () => {
           size={350}
           interactive={false}
           showPercentages={false}
-         />
+        />
         
         <Question>
           Você está pronta(o) para entender como estão 
@@ -163,12 +194,16 @@ const HomePage = () => {
           </TipsList>
         </TipsSection>
 
-        <div style={{ textAlign: 'center' }}>
-          <p style={{ marginBottom: '1rem', color: '#666' }}>Clique no botão!</p>
+        <ButtonContainer>
           <StartButton onClick={startAssessment}>
             COMEÇAR TESTE
           </StartButton>
-        </div>
+          {isAuthenticated && (
+            <DashboardButton onClick={goToDashboard}>
+              VER AVALIAÇÕES
+            </DashboardButton>
+          )}
+        </ButtonContainer>
       </ContentCard>
     </Container>
   );

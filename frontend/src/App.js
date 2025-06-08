@@ -9,6 +9,8 @@ import ResultsPage from './pages/ResultsPage';
 import ActionPlanPage from './pages/ActionPlanPage';
 import LoginPage from './pages/LoginPage';
 import RegisterPage from './pages/RegisterPage';
+import DashboardPage from './pages/DashboardPage';
+import CompareAssessmentsPage from './pages/CompareAssessmentsPage';
 import ProtectedRoute from './components/ProtectedRoute';
 import ErrorBoundary from './components/ErrorBoundary';
 import './App.css';
@@ -44,6 +46,14 @@ function App() {
               <Route path="/register" element={<RegisterPage />} />
               <Route path="/" element={<HomePage />} />
               <Route 
+                path="/dashboard" 
+                element={
+                  <ProtectedRoute>
+                    <DashboardPage />
+                  </ProtectedRoute>
+                } 
+              />
+              <Route 
                 path="/assessment/:id" 
                 element={
                   <ProtectedRoute>
@@ -64,6 +74,14 @@ function App() {
                 element={
                   <ProtectedRoute>
                     <ActionPlanPage />
+                  </ProtectedRoute>
+                } 
+              />
+              <Route 
+                path="/compare-assessments" 
+                element={
+                  <ProtectedRoute>
+                    <CompareAssessmentsPage />
                   </ProtectedRoute>
                 } 
               />

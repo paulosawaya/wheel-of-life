@@ -4,9 +4,8 @@ import { useParams, useNavigate } from 'react-router-dom';
 import styled from 'styled-components';
 import api from '../services/api';
 import toast from 'react-hot-toast';
-import WheelDiagram from '../components/WheelDiagram'; // Ensure this path is correct
+import WheelDiagram from '../components/WheelDiagram';
 
-// Styled Components (keep them as they are or adjust if needed)
 const Container = styled.div`
   min-height: 100vh;
   background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
@@ -36,13 +35,12 @@ const MainContent = styled.div`
 const ContentCard = styled.div`
   background: white;
   border-radius: 20px;
-  padding: 2rem; /* Adjusted padding */
+  padding: 2rem;
   flex: 1;
   box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
-  max-height: 85vh; /* Added max-height */
-  overflow-y: auto; /* Added overflow */
+  max-height: 85vh;
+  overflow-y: auto;
 
-   /* Custom scrollbar for webkit browsers */
   &::-webkit-scrollbar {
     width: 8px;
   }
@@ -63,15 +61,15 @@ const WheelCard = styled.div`
   background: white;
   border-radius: 20px;
   padding: 2rem;
-  width: 100%; /* Make it responsive */
-  max-width: 450px; /* Max width for larger screens */
+  width: 100%;
+  max-width: 450px;
   box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
   position: sticky;
   top: 2rem;
 
   @media (max-width: 1200px) {
-    position: static; /* Becomes static on smaller screens */
-    order: -1; /* Move wheel to top on smaller screens */
+    position: static;
+    order: -1;
     margin-bottom: 2rem;
   }
 `;
@@ -85,21 +83,16 @@ const AreaTitle = styled.h2`
 const SubcategoryTitle = styled.h3`
   color: #666;
   font-size: 1.3rem;
-  margin: 1.5rem 0 1rem 0; /* Adjusted margin */
+  margin: 1.5rem 0 1rem 0;
   padding-bottom: 0.5rem;
   border-bottom: 2px solid #f0f0f0;
-`;
-
-const AreaNote = styled.p`
-  color: #666;
-  margin-bottom: 1.5rem; /* Adjusted margin */
 `;
 
 const QuestionContainer = styled.div`
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 1rem; /* Adjusted margin */
+  margin-bottom: 1rem;
   padding: 1rem;
   border-radius: 10px;
   background: #f8f9fa;
@@ -121,7 +114,7 @@ const QuestionText = styled.span`
   color: #333;
   font-size: 1rem;
   line-height: 1.4;
-  margin-bottom: 0.5rem; /* Added margin for mobile */
+  margin-bottom: 0.5rem;
 
   @media (max-width: 600px) {
     margin-bottom: 0.5rem;
@@ -152,7 +145,7 @@ const ScoreInput = styled.input`
   
   @media (max-width: 600px) {
     margin-left: 0;
-    width: 100%; /* Full width on mobile */
+    width: 100%;
   }
 `;
 
@@ -160,6 +153,7 @@ const ButtonContainer = styled.div`
   display: flex;
   justify-content: center;
   margin-top: 2rem;
+  gap: 1rem;
 `;
 
 const ContinueButton = styled.button`
@@ -187,12 +181,20 @@ const ContinueButton = styled.button`
   }
 `;
 
+const SaveButton = styled(ContinueButton)`
+  background: #e67e22;
+  
+  &:hover:not(:disabled) {
+    background: #d35400;
+  }
+`;
+
 const ProgressIndicator = styled.div`
   display: flex;
   justify-content: center;
-  margin-bottom: 1.5rem; /* Adjusted margin */
+  margin-bottom: 1.5rem;
   gap: 0.5rem;
-  flex-wrap: wrap; /* Allow dots to wrap */
+  flex-wrap: wrap;
 `;
 
 const ProgressDot = styled.div`
@@ -232,28 +234,24 @@ const LoadingContainer = styled.div`
   display: flex;
   justify-content: center;
   align-items: center;
-  height: 200px; /* Or any suitable height */
+  height: 200px;
   font-size: 1.2rem;
   color: #666;
 `;
 
-
 const AssessmentPage = () => {
-  const { id: assessmentId } = useParams(); // Renamed to avoid conflict
+  const { id: assessmentId } = useParams();
   const navigate = useNavigate();
 
-  // State for data fetching and management
-  const [lifeAreas, setLifeAreas] = useState([]); // Stores areas with their subcategories
-  const [allQuestionsBySubcategory, setAllQuestionsBySubcategory] = useState({}); // { subcategoryId: [questions] }
+  const [lifeAreas, setLifeAreas] = useState([]);
+  const [allQuestionsBySubcategory, setAllQuestionsBySubcategory] = useState({});
   const [currentAreaIndex, setCurrentAreaIndex] = useState(0);
-  const [responses, setResponses] = useState({}); // { questionId: score }
+  const [responses, setResponses] = useState({});
   const [isLoading, setIsLoading] = useState(true);
-  const [completedAreas, setCompletedAreas] = useState([]); // Array of completed area indices
+  const [completedAreas, setCompletedAreas] = useState([]);
+  const [wheelDataForDiagram, setWheelDataForDiagram] = useState(null);
+  const [isSaving, setIsSaving] = useState(false);
 
-  // State for the WheelDiagram
-  const [wheelDataForDiagram, setWheelDataForDiagram] = useState(null); // Data structure for WheelDiagram
-
-  // Helper to get all questions for the current area being displayed
   const getCurrentAreaDisplayedQuestions = useCallback(() => {
     if (!lifeAreas[currentAreaIndex] || !lifeAreas[currentAreaIndex].subcategories) {
       return [];
@@ -264,260 +262,207 @@ const AssessmentPage = () => {
     });
     return questions;
   }, [currentAreaIndex, lifeAreas, allQuestionsBySubcategory]);
-  
 
-  // 1. Load initial structure: life areas and their subcategories
   useEffect(() => {
-    const loadInitialStructure = async () => {
-      setIsLoading(true);
-      try {
-        const areasResponse = await api.get('/life-areas');
-        const areasData = areasResponse.data;
-
-        const detailedAreasPromises = areasData.map(async (area) => {
-          const subcatResponse = await api.get(`/life-areas/${area.id}/subcategories`);
-          const subcategoriesWithScore = subcatResponse.data.map(sc => ({ ...sc, score: 0, questions: [] }));
-          return { ...area, score: 0, subcategories: subcategoriesWithScore };
-        });
-
-        const detailedAreas = await Promise.all(detailedAreasPromises);
-        setLifeAreas(detailedAreas);
-
-        // Pre-populate wheelDataForDiagram structure
-        const initialWheelData = {
-          areas: detailedAreas.map(area => ({
-            id: area.id,
-            name: area.name,
-            color: area.color,
-            score: 0, // Area score, will be calculated
-            subcategories: area.subcategories.map(sc => ({
-              id: sc.id,
-              name: sc.name,
-              score: 0 // Subcategory score, will be calculated
-            }))
-          }))
-        };
-        setWheelDataForDiagram(initialWheelData);
-        
-        if (detailedAreas.length > 0) {
-          setCurrentAreaIndex(0); // Start with the first area
-        }
-      } catch (error) {
-        toast.error('Erro ao carregar estrutura da avaliação.');
-        console.error("Error loading initial structure:", error);
-      } finally {
-        setIsLoading(false);
-      }
-    };
-    loadInitialStructure();
+    loadAssessmentData();
   }, []);
 
-  // 2. Load questions for the current area when it changes or when lifeAreas is populated
   useEffect(() => {
-    if (lifeAreas.length === 0 || !lifeAreas[currentAreaIndex]) return;
+    loadAreaQuestions();
+  }, [currentAreaIndex]);
 
-    const loadQuestionsForArea = async () => {
-      const currentArea = lifeAreas[currentAreaIndex];
-      if (!currentArea || !currentArea.subcategories) return;
+  useEffect(() => {
+    updateWheelData();
+  }, [responses, lifeAreas]);
+
+  const loadAssessmentData = async () => {
+    try {
+      setIsLoading(true);
       
-      setIsLoading(true); // Show loading when fetching questions for a new area
-      const newQuestionsBySubcat = { ...allQuestionsBySubcategory };
-      let questionsActuallyFetched = false;
-
-      try {
-        for (const sub of currentArea.subcategories) {
-          // Only fetch if not already loaded
-          if (!newQuestionsBySubcat[sub.id] || newQuestionsBySubcat[sub.id].length === 0) {
-            const questionsResponse = await api.get(`/subcategories/${sub.id}/questions`);
-            newQuestionsBySubcat[sub.id] = questionsResponse.data;
-            questionsActuallyFetched = true;
-          }
-        }
-        if (questionsActuallyFetched) {
-          setAllQuestionsBySubcategory(newQuestionsBySubcat);
-        }
-      } catch (error) {
-        toast.error(`Erro ao carregar questões para ${currentArea.name}.`);
-        console.error("Error loading questions for area:", error);
-      } finally {
-        setIsLoading(false);
+      // Load assessment progress
+      const progressResponse = await api.get(`/assessments/${assessmentId}/progress`);
+      const { assessment, answered_questions } = progressResponse.data;
+      
+      // Load life areas
+      const areasResponse = await api.get('/life-areas');
+      setLifeAreas(areasResponse.data);
+      
+      // Set current area index from saved progress
+      setCurrentAreaIndex(assessment.current_area_index || 0);
+      
+      // Load saved responses
+      setResponses(answered_questions || {});
+      
+      // Determine completed areas
+      const completed = [];
+      for (let i = 0; i < assessment.current_area_index; i++) {
+        completed.push(i);
       }
-    };
-
-    loadQuestionsForArea();
-  }, [currentAreaIndex, lifeAreas]); // Removed allQuestionsBySubcategory from deps to avoid loop
-
-  // 3. Update WheelDiagram data whenever responses or areas change
-  useEffect(() => {
-    if (!lifeAreas.length || Object.keys(allQuestionsBySubcategory).length === 0) {
-      // If lifeAreas or allQuestionsBySubcategory is not ready, use the initial or last known wheelDataForDiagram
-      // This prevents the wheel from disappearing if data is still loading.
-      return;
+      setCompletedAreas(completed);
+      
+    } catch (error) {
+      toast.error('Erro ao carregar dados da avaliação');
+      navigate('/dashboard');
+    } finally {
+      setIsLoading(false);
     }
-  
-    const newDiagramData = {
-      areas: lifeAreas.map(areaConfig => {
-        let sumOfSubcategoryScores = 0;
-        let countOfScoredSubcategories = 0;
-  
-        const updatedSubcategories = areaConfig.subcategories.map(sub => {
-          const questionsForThisSub = allQuestionsBySubcategory[sub.id] || [];
-          let subcategoryScore = 0;
-          let answeredQuestionsInSub = 0;
-          let totalScoreInSub = 0;
-  
-          if (questionsForThisSub.length > 0) {
-            questionsForThisSub.forEach(q => {
-              if (responses[q.id] !== undefined) {
-                totalScoreInSub += responses[q.id];
-                answeredQuestionsInSub++;
-              }
-            });
-            // Calculate score only if at least one question is answered, otherwise it's 0
-            // Or, if you want to average over all questions, even unanswered (treating them as 0):
-            // subcategoryScore = totalScoreInSub / questionsForThisSub.length;
-            subcategoryScore = answeredQuestionsInSub > 0 ? totalScoreInSub / questionsForThisSub.length : 0;
+  };
 
+  const loadAreaQuestions = async () => {
+    if (!lifeAreas[currentAreaIndex]) return;
+
+    try {
+      const currentArea = lifeAreas[currentAreaIndex];
+      const questionsMap = {};
+
+      for (const subcategory of currentArea.subcategories) {
+        const response = await api.get(`/subcategories/${subcategory.id}/questions`);
+        questionsMap[subcategory.id] = response.data;
+      }
+
+      setAllQuestionsBySubcategory(prev => ({
+        ...prev,
+        ...questionsMap
+      }));
+    } catch (error) {
+      toast.error('Erro ao carregar questões');
+    }
+  };
+
+  const updateWheelData = () => {
+    const areaScores = lifeAreas.map((area, index) => {
+      let totalScore = 0;
+      let questionCount = 0;
+
+      area.subcategories.forEach(sub => {
+        const questions = allQuestionsBySubcategory[sub.id] || [];
+        questions.forEach(q => {
+          if (responses[q.id] !== undefined) {
+            totalScore += responses[q.id];
+            questionCount++;
           }
-          
-          if (questionsForThisSub.length > 0) { // Consider a subcategory for area average if it has questions
-            sumOfSubcategoryScores += subcategoryScore;
-            countOfScoredSubcategories++;
-          }
-  
-          return {
-            ...sub, // id, name from lifeAreas structure
-            score: parseFloat(subcategoryScore.toFixed(1)) // Score from 0 to 10
-          };
         });
-  
-        const areaScore = countOfScoredSubcategories > 0 ? sumOfSubcategoryScores / countOfScoredSubcategories : 0;
-  
-        return {
-          ...areaConfig, // id, name, color from lifeAreas structure
-          score: parseFloat(areaScore.toFixed(1)), // Area score from 0 to 10
-          subcategories: updatedSubcategories
-        };
-      })
-    };
-    setWheelDataForDiagram(newDiagramData);
-  
-  }, [responses, lifeAreas, allQuestionsBySubcategory]);
+      });
 
+      const averageScore = questionCount > 0 ? totalScore / questionCount : 0;
+      const percentage = (averageScore / 10) * 100;
+
+      return {
+        area: area.name,
+        percentage: percentage,
+        color: area.color || '#4ECDC4',
+        completed: completedAreas.includes(index) || index < currentAreaIndex
+      };
+    });
+
+    setWheelDataForDiagram({ areas: areaScores });
+  };
 
   const handleScoreChange = (questionId, score) => {
-    const value = score === '' ? undefined : parseInt(score, 10); // Allow clearing the input
-    if (value === undefined || (value >= 0 && value <= 10)) {
+    const numScore = parseInt(score);
+    if (numScore >= 0 && numScore <= 10) {
       setResponses(prev => ({
         ...prev,
-        [questionId]: value
+        [questionId]: numScore
       }));
     }
   };
 
-  const saveCurrentAreaResponsesAPI = async () => {
-    const currentArea = lifeAreas[currentAreaIndex];
-    if (!currentArea) return;
-
-    const areaResponsesPayload = [];
-    currentArea.subcategories.forEach(sub => {
-      const questionsForSub = allQuestionsBySubcategory[sub.id] || [];
-      questionsForSub.forEach(q => {
+  const saveProgress = async () => {
+    try {
+      setIsSaving(true);
+      
+      // Save responses
+      const areaResponses = [];
+      const questions = getCurrentAreaDisplayedQuestions();
+      
+      questions.forEach(q => {
         if (responses[q.id] !== undefined) {
-          areaResponsesPayload.push({
+          areaResponses.push({
             question_id: q.id,
             score: responses[q.id]
           });
         }
       });
-    });
-    
-    if (areaResponsesPayload.length === 0) { // No responses to save for this area
-        return;
-    }
 
-    try {
       await api.post(`/assessments/${assessmentId}/responses`, {
-        responses: areaResponsesPayload
+        responses: areaResponses
       });
-      // toast.success(`Respostas para ${currentArea.name} salvas!`); // Optional: per-area save confirmation
+
+      // Update progress
+      await api.post(`/assessments/${assessmentId}/update-progress`, {
+        current_area_index: currentAreaIndex
+      });
+
+      toast.success('Progresso salvo com sucesso!');
     } catch (error) {
-      toast.error(`Erro ao salvar respostas para ${currentArea.name}.`);
-      console.error("Error saving responses:", error);
-      throw error; // Re-throw to stop progression
+      toast.error('Erro ao salvar progresso');
+    } finally {
+      setIsSaving(false);
     }
   };
 
   const handleContinue = async () => {
-    const currentQuestions = getCurrentAreaDisplayedQuestions();
-    const unansweredQuestions = currentQuestions.filter(q => responses[q.id] === undefined || responses[q.id] === '');
+    const questions = getCurrentAreaDisplayedQuestions();
+    const unansweredQuestions = questions.filter(q => responses[q.id] === undefined);
     
     if (unansweredQuestions.length > 0) {
-      toast.error('Por favor, responda todas as questões da área atual.');
+      toast.error('Por favor, responda todas as questões');
       return;
     }
 
     try {
-      await saveCurrentAreaResponsesAPI();
-      setCompletedAreas(prev => [...new Set([...prev, currentAreaIndex])]); // Mark area as completed
-
+      await saveProgress();
+      
       if (currentAreaIndex < lifeAreas.length - 1) {
-        setCurrentAreaIndex(prev => prev + 1);
+        const newIndex = currentAreaIndex + 1;
+        setCurrentAreaIndex(newIndex);
+        setCompletedAreas([...completedAreas, currentAreaIndex]);
+        
+        // Update progress in backend
+        await api.post(`/assessments/${assessmentId}/update-progress`, {
+          current_area_index: newIndex
+        });
       } else {
-        // All areas completed, finalize assessment
-        toast.loading('Calculando resultados finais...', { duration: 1500 });
+        // Complete assessment
         await api.post(`/assessments/${assessmentId}/calculate`);
         navigate(`/results/${assessmentId}`);
       }
     } catch (error) {
-      // Error is handled in saveCurrentAreaResponsesAPI
+      // Error already handled
     }
   };
 
-  const jumpToArea = async (index) => {
-    // Only allow jumping if current area is complete or jumping to an already completed/current area
-    const currentQuestions = getCurrentAreaDisplayedQuestions();
-    const isCurrentAreaComplete = currentQuestions.every(q => responses[q.id] !== undefined && responses[q.id] !== '');
-
-    if (index !== currentAreaIndex && !isCurrentAreaComplete && !completedAreas.includes(currentAreaIndex)) {
-        toast.error(`Por favor, complete a área atual (${lifeAreas[currentAreaIndex].name}) antes de mudar.`);
-        return;
-    }
-    if (index !== currentAreaIndex && isCurrentAreaComplete && !completedAreas.includes(currentAreaIndex)) {
-        try {
-            await saveCurrentAreaResponsesAPI();
-            setCompletedAreas(prev => [...new Set([...prev, currentAreaIndex])]);
-            setCurrentAreaIndex(index);
-        } catch (error) {
-            // Error saving, don't navigate
-            return;
-        }
-    } else {
-       setCurrentAreaIndex(index);
+  const jumpToArea = (index) => {
+    if (index <= Math.max(...completedAreas, currentAreaIndex)) {
+      setCurrentAreaIndex(index);
     }
   };
 
-
-  if (isLoading && !lifeAreas.length) { // Show initial loading only if no areas are loaded yet
-    return <LoadingContainer>Carregando avaliação...</LoadingContainer>;
-  }
-
-  if (!lifeAreas.length) {
-    return <Container><Header>Nenhuma área da vida encontrada para avaliação.</Header></Container>;
+  if (isLoading) {
+    return (
+      <Container>
+        <LoadingContainer>
+          <p>Carregando avaliação...</p>
+        </LoadingContainer>
+      </Container>
+    );
   }
 
   const currentArea = lifeAreas[currentAreaIndex];
-  const currentQuestionsForDisplay = getCurrentAreaDisplayedQuestions();
-  const totalQuestionsInCurrentArea = currentQuestionsForDisplay.length;
-  const answeredQuestionsInCurrentArea = currentQuestionsForDisplay.filter(q => responses[q.id] !== undefined && responses[q.id] !== '').length;
-  const isCurrentAreaAllAnswered = totalQuestionsInCurrentArea > 0 && answeredQuestionsInCurrentArea === totalQuestionsInCurrentArea;
-
+  const questions = getCurrentAreaDisplayedQuestions();
+  const answeredCount = questions.filter(q => responses[q.id] !== undefined).length;
+  const isAreaComplete = answeredCount === questions.length && questions.length > 0;
 
   return (
     <Container>
       <Header>
-        <h1>RODA DA VIDA</h1>
-        <p>Mapeie a relação e o equilíbrio entre as diversas áreas de sua vida!</p>
+        <h1 style={{ fontSize: '2.5rem', marginBottom: '0.5rem' }}>
+          Avaliação da Roda da Vida
+        </h1>
+        <p style={{ fontSize: '1.2rem', opacity: 0.9 }}>
+          Avalie cada área da sua vida de 0 a 10
+        </p>
       </Header>
 
       <MainContent>
@@ -525,7 +470,7 @@ const AssessmentPage = () => {
           <ProgressIndicator>
             {lifeAreas.map((area, index) => (
               <ProgressDot
-                key={area.id}
+                key={index}
                 active={index === currentAreaIndex}
                 completed={completedAreas.includes(index)}
                 onClick={() => jumpToArea(index)}
@@ -536,68 +481,60 @@ const AssessmentPage = () => {
 
           {currentArea && (
             <>
+              <AreaTitle>{currentArea.name}</AreaTitle>
               <QuestionCounter>
-                {`Questões respondidas: ${answeredQuestionsInCurrentArea} de ${totalQuestionsInCurrentArea}`}
+                {answeredCount} de {questions.length} questões respondidas
               </QuestionCounter>
-              <AreaTitle>{currentArea.name.toUpperCase()}</AreaTitle>
-              <AreaNote>(Dê uma nota de 0 a 10 para cada afirmação)</AreaNote>
 
-              {isLoading && currentQuestionsForDisplay.length === 0 && <LoadingContainer>Carregando questões...</LoadingContainer>}
-
-              {currentArea.subcategories.map((subcategory) => (
-                <div key={subcategory.id}>
-                  <SubcategoryTitle>{subcategory.name}</SubcategoryTitle>
-                  {(allQuestionsBySubcategory[subcategory.id] || []).map((question, qIndex) => {
-                    const questionNumberInArea = currentArea.subcategories
-                      .slice(0, currentArea.subcategories.findIndex(s => s.id === subcategory.id))
-                      .reduce((acc, s) => acc + (allQuestionsBySubcategory[s.id]?.length || 0), 0) + qIndex + 1;
+              {currentArea.subcategories.map(subcategory => {
+                const subcategoryQuestions = allQuestionsBySubcategory[subcategory.id] || [];
+                
+                return (
+                  <div key={subcategory.id}>
+                    <SubcategoryTitle>{subcategory.name}</SubcategoryTitle>
                     
-                    return (
+                    {subcategoryQuestions.map(question => (
                       <QuestionContainer key={question.id}>
-                        <QuestionText>
-                          {questionNumberInArea}. {question.question_text}
-                        </QuestionText>
+                        <QuestionText>{question.question_text}</QuestionText>
                         <ScoreInput
                           type="number"
                           min="0"
                           max="10"
-                          value={responses[question.id] === undefined ? '' : responses[question.id]}
+                          value={responses[question.id] || ''}
                           onChange={(e) => handleScoreChange(question.id, e.target.value)}
                           placeholder="0-10"
                         />
                       </QuestionContainer>
-                    );
-                  })}
-                </div>
-              ))}
+                    ))}
+                  </div>
+                );
+              })}
+
+              <ButtonContainer>
+                <SaveButton onClick={saveProgress} disabled={isSaving}>
+                  {isSaving ? 'Salvando...' : 'Salvar Progresso'}
+                </SaveButton>
+                <ContinueButton onClick={handleContinue} disabled={!isAreaComplete}>
+                  {currentAreaIndex < lifeAreas.length - 1 ? 'Continuar' : 'Finalizar'}
+                </ContinueButton>
+              </ButtonContainer>
             </>
           )}
-
-          <ButtonContainer>
-            <ContinueButton
-              onClick={handleContinue}
-              disabled={!isCurrentAreaAllAnswered || isLoading}
-            >
-              {currentAreaIndex < lifeAreas.length - 1 ? 'PRÓXIMA ÁREA >>' : 'FINALIZAR AVALIAÇÃO >>'}
-            </ContinueButton>
-          </ButtonContainer>
         </ContentCard>
 
         <WheelCard>
-          <WheelTitle>Seu Progresso em Tempo Real</WheelTitle>
-          {wheelDataForDiagram ? (
+          <WheelTitle>Seu Progresso</WheelTitle>
+          {wheelDataForDiagram && (
             <WheelDiagram
               data={wheelDataForDiagram}
-              showSubcategories={true} // Always show subcategories for live update
               size={350}
-              interactive={false} // Non-interactive during assessment for clarity
+              interactive={false}
               showPercentages={true}
             />
-          ) : (
-            <LoadingContainer>Carregando diagrama...</LoadingContainer>
           )}
           <ScoreDisplay>
-            Áreas completas: {completedAreas.length} de {lifeAreas.length}
+            <p>Áreas Completas: {completedAreas.length}/{lifeAreas.length}</p>
+            <p>Progresso Total: {Math.round((completedAreas.length / lifeAreas.length) * 100)}%</p>
           </ScoreDisplay>
         </WheelCard>
       </MainContent>

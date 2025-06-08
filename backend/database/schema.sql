@@ -47,6 +47,7 @@ CREATE TABLE assessments (
     user_id INT NOT NULL,
     title VARCHAR(255) DEFAULT 'Avaliação da Roda da Vida',
     status ENUM('in_progress', 'completed') DEFAULT 'in_progress',
+    current_area_index INT DEFAULT 0,
     started_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     completed_at TIMESTAMP NULL,
     FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
