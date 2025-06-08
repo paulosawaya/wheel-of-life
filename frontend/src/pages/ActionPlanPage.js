@@ -230,11 +230,14 @@ const ActionPlanPage = () => {
     }
   };
 
-  const wheelData = results.map(result => ({
+const wheelData = {
+  areas: results.map(result => ({
     name: result.life_area_name,
     color: result.color,
+    score: result.average_score,
     percentage: result.percentage
-  }));
+  }))
+};
 
   if (step === 1) {
     return (
