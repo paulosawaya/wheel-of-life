@@ -262,14 +262,27 @@ def login():
 @app.route('/api/life-areas', methods=['GET'])
 def get_life_areas():
     areas = LifeArea.query.order_by(LifeArea.display_order).all()
-    return jsonify([{
-        'id': area.id,
-        'name': area.name,
-        'description': area.description,
-        'color': area.color,
-        'icon': area.icon,
-        'display_order': area.display_order
-    } for area in areas])
+
+    # This new structure will include the subcategories for each area
+    result = []
+    for area in areas:
+        area_data = {
+            'id': area.id,
+            'name': area.name,
+            'description': area.description,
+            'color': area.color,
+            'icon': area.icon,
+            'display_order': area.display_order,
+            'subcategories': [{
+                'id': sub.id,
+                'name': sub.name,
+                'description': sub.description,
+                'display_order': sub.display_order
+            } for sub in area.subcategories]
+        }
+        result.append(area_data)
+
+    return jsonify(result)
 
 @app.route('/api/life-areas/<int:area_id>/subcategories', methods=['GET'])
 def get_area_subcategories(area_id):

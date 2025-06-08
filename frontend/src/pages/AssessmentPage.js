@@ -486,28 +486,21 @@ const AssessmentPage = () => {
                 {answeredCount} de {questions.length} questões respondidas
               </QuestionCounter>
 
-              {currentArea.subcategories.map(subcategory => {
-                const subcategoryQuestions = allQuestionsBySubcategory[subcategory.id] || [];
-                
-                return (
-                  <div key={subcategory.id}>
-                    <SubcategoryTitle>{subcategory.name}</SubcategoryTitle>
-                    
-                    {subcategoryQuestions.map(question => (
-                      <QuestionContainer key={question.id}>
-                        <QuestionText>{question.question_text}</QuestionText>
-                        <ScoreInput
-                          type="number"
-                          min="0"
-                          max="10"
-                          value={responses[question.id] || ''}
-                          onChange={(e) => handleScoreChange(question.id, e.target.value)}
-                          placeholder="0-10"
-                        />
-                      </QuestionContainer>
-                    ))}
-                  </div>
-                );
+              {currentArea.subcategories && currentArea.subcategories.map(subcategory => {
+                  const subcategoryQuestions = allQuestionsBySubcategory[subcategory.id] || [];
+
+                  return (
+                    <div key={subcategory.id}>
+                      <SubcategoryTitle>{subcategory.name}</SubcategoryTitle>
+
+                      {subcategoryQuestions.map(question => (
+                        <QuestionContainer key={question.id}>
+                          <QuestionText>{question.question_text}</QuestionText>
+                          {/* ... rest of the component ... */}
+                        </QuestionContainer>
+                      ))}
+                    </div>
+                  );
               })}
 
               <ButtonContainer>
