@@ -267,9 +267,11 @@ const AssessmentPage = () => {
     loadAssessmentData();
   }, []);
 
-  useEffect(() => {
+useEffect(() => {
+  if (lifeAreas.length > 0) {
     loadAreaQuestions();
-  }, [currentAreaIndex]);
+  }
+}, [currentAreaIndex, lifeAreas]);
 
   useEffect(() => {
     updateWheelData();
