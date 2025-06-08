@@ -5,7 +5,7 @@ import { useForm } from 'react-hook-form';
 import styled from 'styled-components';
 import api from '../services/api';
 import toast from 'react-hot-toast';
-import WheelDiagram, { processAreaResults } from '../components/WheelDiagram';
+import WheelDiagram from '../components/WheelDiagram';
 
 const Container = styled.div`
   min-height: 100vh;
@@ -175,12 +175,14 @@ const ActionPlanPage = () => {
   const [lifeAreas, setLifeAreas] = useState([]);
   const [selectedArea, setSelectedArea] = useState('');
   const [results, setResults] = useState([]);
+  const [isLoading, setIsLoading] = useState(true); // Add loading state
 
   useEffect(() => {
     loadData();
   }, [id]);
 
   const loadData = async () => {
+    setIsLoading(true); // Start loading
     try {
       const [areasResponse, resultsResponse] = await Promise.all([
         api.get('/life-areas'),
@@ -188,9 +190,13 @@ const ActionPlanPage = () => {
       ]);
       
       setLifeAreas(areasResponse.data);
-      setResults(resultsResponse.data.results);
+      // Ensure results is always an array
+      setResults(resultsResponse.data.area_results || []);
     } catch (error) {
       toast.error('Erro ao carregar dados');
+      setResults([]); // Set to empty array on error
+    } finally {
+      setIsLoading(false); // Stop loading
     }
   };
 
@@ -239,11 +245,22 @@ const ActionPlanPage = () => {
     }
   };
 
-  const wheelData = results.map(result => ({
+  // Safely map over results
+  const wheelData = (results || []).map(result => ({
     name: result.life_area_name,
     color: result.color,
     percentage: result.percentage
   }));
+
+  if (isLoading) {
+    return (
+      <Container>
+        <Header>
+          <h1>Carregando Plano de Ação...</h1>
+        </Header>
+      </Container>
+    );
+  }
 
   if (step === 1) {
     return (
