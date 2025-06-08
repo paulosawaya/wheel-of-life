@@ -16,12 +16,14 @@ export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
 
+  // This effect runs once on app load to check for an existing token
   useEffect(() => {
     const token = localStorage.getItem('token');
     if (token) {
-      api.defaults.headers.common['Authorization'] = `Bearer ${token}`;
-      // You could verify the token here with a /me endpoint
-      setUser({ token }); // Simplified - in real app, decode token or call /me
+      // If a token exists, we'll assume the user is logged in.
+      // We can optionally decode the token here to get user info if needed.
+      // For now, a simple object will suffice to indicate an authenticated state.
+      setUser({ token });
     }
     setIsLoading(false);
   }, []);
@@ -32,11 +34,13 @@ export const AuthProvider = ({ children }) => {
       const { access_token, user } = response.data;
       
       localStorage.setItem('token', access_token);
-      api.defaults.headers.common['Authorization'] = `Bearer ${access_token}`;
-      setUser(user);
+      setUser(user); // Set the user state, which will trigger re-renders
       
       return { success: true };
     } catch (error) {
+      // Clear any lingering token on failed login
+      localStorage.removeItem('token');
+      setUser(null);
       return { 
         success: false, 
         error: error.response?.data?.message || 'Erro ao fazer login' 
@@ -50,11 +54,12 @@ export const AuthProvider = ({ children }) => {
       const { access_token, user } = response.data;
       
       localStorage.setItem('token', access_token);
-      api.defaults.headers.common['Authorization'] = `Bearer ${access_token}`;
-      setUser(user);
+      setUser(user); // Set the user state
       
       return { success: true };
     } catch (error) {
+      localStorage.removeItem('token');
+      setUser(null);
       return { 
         success: false, 
         error: error.response?.data?.message || 'Erro ao fazer cadastro' 
@@ -64,8 +69,9 @@ export const AuthProvider = ({ children }) => {
 
   const logout = () => {
     localStorage.removeItem('token');
-    delete api.defaults.headers.common['Authorization'];
-    setUser(null);
+    setUser(null); // Clear the user state
+    // Redirect to login page to ensure a clean state
+    window.location.href = '/login';
   };
 
   const value = {
@@ -73,7 +79,8 @@ export const AuthProvider = ({ children }) => {
     login,
     register,
     logout,
-    isAuthenticated: !!user
+    isAuthenticated: !!user,
+    isLoading, // Expose isLoading for a better loading experience
   };
 
   return (
