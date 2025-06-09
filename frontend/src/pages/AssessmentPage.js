@@ -498,8 +498,16 @@ useEffect(() => {
                       {subcategoryQuestions.map(question => (
                         <QuestionContainer key={question.id}>
                           <QuestionText>{question.question_text}</QuestionText>
-                          {/* ... rest of the component ... */}
+                          <ScoreInput
+                            type="number"
+                            min="0"
+                            max="10"
+                            value={responses[question.id] || ''}
+                            onChange={(e) => handleScoreChange(question.id, e.target.value)}
+                            aria-label={`Score for ${question.question_text}`}
+                          />
                         </QuestionContainer>
+
                       ))}
                     </div>
                   );
