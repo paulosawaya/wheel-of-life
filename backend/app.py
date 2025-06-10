@@ -8,6 +8,7 @@ from flask_limiter.util import get_remote_address
 from marshmallow import Schema, fields, ValidationError
 import bcrypt
 import logging
+import sqlalchemy.exc
 from datetime import datetime, timedelta
 import os
 from dotenv import load_dotenv
@@ -484,6 +485,9 @@ def save_responses(assessment_id):
             'saved_count': saved_count
         }), 200
         
+    except sqlalchemy.exc.IntegrityError as ie:
+        logger.error(f"Database IntegrityError while saving responses for assessment {assessment_id}: {str(ie)}", exc_info=True)
+        return jsonify({'error': f'Falha de integridade ao salvar respostas. Detalhe: {str(ie)}. Tente novamente.'}), 500
     except Exception as e:
         logger.error(f"Failed to save responses for assessment {assessment_id}: {str(e)}", exc_info=True)
         return jsonify({'error': 'Falha ao salvar respostas. Tente novamente.'}), 500
