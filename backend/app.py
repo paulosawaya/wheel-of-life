@@ -8,6 +8,7 @@ from flask_limiter.util import get_remote_address
 from marshmallow import Schema, fields, ValidationError
 import bcrypt
 import logging
+import sqlalchemy.exc
 from datetime import datetime, timedelta
 import os
 from dotenv import load_dotenv
@@ -452,6 +453,9 @@ def save_responses(assessment_id):
         with db.session.begin():
             saved_count = 0
             for response_data in data['responses']:
+                if response_data.get('score') is None:
+                    logger.warning(f"Skipping response for question {response_data.get('question_id')} due to null score. Assessment ID: {assessment_id}")
+                    continue
                 # Verify question exists
                 question = Question.query.get(response_data['question_id'])
                 if not question:
@@ -465,7 +469,6 @@ def save_responses(assessment_id):
                 
                 if existing_response:
                     existing_response.score = response_data['score']
-                    existing_response.updated_at = datetime.utcnow()
                 else:
                     response = Response(
                         assessment_id=assessment_id,
@@ -482,8 +485,11 @@ def save_responses(assessment_id):
             'saved_count': saved_count
         }), 200
         
+    except sqlalchemy.exc.IntegrityError as ie:
+        logger.error(f"Database IntegrityError while saving responses for assessment {assessment_id}: {str(ie)}", exc_info=True)
+        return jsonify({'error': f'Falha de integridade ao salvar respostas. Detalhe: {str(ie)}. Tente novamente.'}), 500
     except Exception as e:
-        logger.error(f"Failed to save responses for assessment {assessment_id}: {str(e)}")
+        logger.error(f"Failed to save responses for assessment {assessment_id}: {str(e)}", exc_info=True)
         return jsonify({'error': 'Falha ao salvar respostas. Tente novamente.'}), 500
 
 @app.route('/api/assessments/<int:assessment_id>/calculate', methods=['POST'])
