@@ -597,10 +597,11 @@ def get_assessment_results(assessment_id):
     if not assessment:
         return jsonify({'message': 'Assessment não encontrado'}), 404
     
-    # Get area scores with colors
-    area_scores = db.session.query(AreaScore, LifeArea).join(LifeArea).filter(
-        AreaScore.assessment_id == assessment_id
-    ).all()
+    # Get area scores with explicit join
+    area_scores = db.session.query(AreaScore, LifeArea)\
+        .join(LifeArea, AreaScore.life_area_id == LifeArea.id)\
+        .filter(AreaScore.assessment_id == assessment_id)\
+        .all()
     
     area_results = [{
         'life_area_id': score.life_area_id,
@@ -610,12 +611,13 @@ def get_assessment_results(assessment_id):
         'percentage': float(score.percentage)
     } for score, area in area_scores]
     
-    # Get subcategory scores
-    subcategory_scores = db.session.query(SubcategoryScore, Subcategory, LifeArea).join(
-        Subcategory
-    ).join(LifeArea).filter(
-        SubcategoryScore.assessment_id == assessment_id
-    ).all()
+    # Get subcategory scores with explicit joins and select_from
+    subcategory_scores = db.session.query(SubcategoryScore, Subcategory, LifeArea)\
+        .select_from(SubcategoryScore)\
+        .join(Subcategory, SubcategoryScore.subcategory_id == Subcategory.id)\
+        .join(LifeArea, Subcategory.life_area_id == LifeArea.id)\
+        .filter(SubcategoryScore.assessment_id == assessment_id)\
+        .all()
     
     subcategory_results = [{
         'subcategory_id': score.subcategory_id,
@@ -626,9 +628,6 @@ def get_assessment_results(assessment_id):
         'percentage': float(score.percentage)
     } for score, subcategory, area in subcategory_scores]
     
-    # Legacy format for backward compatibility
-    results = area_results
-    
     return jsonify({
         'assessment': {
             'id': assessment.id,
@@ -637,8 +636,7 @@ def get_assessment_results(assessment_id):
             'completed_at': assessment.completed_at.isoformat() if assessment.completed_at else None
         },
         'area_results': area_results,
-        'subcategory_results': subcategory_results,
-        'results': results  # Legacy format
+        'subcategory_results': subcategory_results
     })
 
 @app.route('/api/assessments/<int:assessment_id>/action-plan', methods=['POST'])
