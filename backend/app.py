@@ -449,35 +449,39 @@ def save_responses(assessment_id):
         return jsonify({'error': 'Avaliação não encontrada'}), 404
     
     try:
-        # IMPROVEMENT: Use database transaction for data integrity
-        with db.session.begin():
-            saved_count = 0
-            for response_data in data['responses']:
-                if response_data.get('score') is None:
-                    logger.warning(f"Skipping response for question {response_data.get('question_id')} due to null score. Assessment ID: {assessment_id}")
-                    continue
-                # Verify question exists
-                question = Question.query.get(response_data['question_id'])
-                if not question:
-                    logger.warning(f"Question {response_data['question_id']} not found")
-                    continue
+        # Remove manual transaction management - let Flask-SQLAlchemy handle it
+        saved_count = 0
+        for response_data in data['responses']:
+            if response_data.get('score') is None:
+                logger.warning(f"Skipping response for question {response_data.get('question_id')} due to null score.")
+                continue
                 
-                existing_response = Response.query.filter_by(
+            # Verify question exists
+            question = Question.query.get(response_data['question_id'])
+            if not question:
+                logger.warning(f"Question {response_data['question_id']} not found")
+                continue
+            
+            existing_response = Response.query.filter_by(
+                assessment_id=assessment_id,
+                question_id=response_data['question_id']
+            ).first()
+            
+            if existing_response:
+                existing_response.score = response_data['score']
+                existing_response.updated_at = datetime.utcnow()
+            else:
+                response = Response(
                     assessment_id=assessment_id,
-                    question_id=response_data['question_id']
-                ).first()
-                
-                if existing_response:
-                    existing_response.score = response_data['score']
-                else:
-                    response = Response(
-                        assessment_id=assessment_id,
-                        question_id=response_data['question_id'],
-                        score=response_data['score']
-                    )
-                    db.session.add(response)
-                
-                saved_count += 1
+                    question_id=response_data['question_id'],
+                    score=response_data['score']
+                )
+                db.session.add(response)
+            
+            saved_count += 1
+        
+        # Commit all changes at once
+        db.session.commit()
         
         logger.info(f"Saved {saved_count} responses for assessment {assessment_id}")
         return jsonify({
@@ -486,12 +490,14 @@ def save_responses(assessment_id):
         }), 200
         
     except sqlalchemy.exc.IntegrityError as ie:
+        db.session.rollback()  # Rollback on integrity error
         logger.error(f"Database IntegrityError while saving responses for assessment {assessment_id}: {str(ie)}", exc_info=True)
         return jsonify({'error': f'Falha de integridade ao salvar respostas. Detalhe: {str(ie)}. Tente novamente.'}), 500
     except Exception as e:
+        db.session.rollback()  # Rollback on any error
         logger.error(f"Failed to save responses for assessment {assessment_id}: {str(e)}", exc_info=True)
         return jsonify({'error': 'Falha ao salvar respostas. Tente novamente.'}), 500
-
+    
 @app.route('/api/assessments/<int:assessment_id>/calculate', methods=['POST'])
 @jwt_required()
 def calculate_scores(assessment_id):
