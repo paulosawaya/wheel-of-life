@@ -6,9 +6,11 @@ from flask_jwt_extended import JWTManager, jwt_required, create_access_token, ge
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
 from marshmallow import Schema, fields, ValidationError
+from werkzeug.exceptions import HTTPException
 import bcrypt
 import logging
 import sqlalchemy.exc
+import traceback
 from datetime import datetime, timedelta
 import os
 from dotenv import load_dotenv
@@ -20,6 +22,9 @@ app.config['SQLALCHEMY_DATABASE_URI'] = os.getenv('DATABASE_URL', 'mysql+pymysql
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 app.config['JWT_SECRET_KEY'] = os.getenv('JWT_SECRET_KEY', 'your-secret-key-change-this')
 app.config['JWT_ACCESS_TOKEN_EXPIRES'] = timedelta(hours=24)
+
+# Check if we're in debug mode
+DEBUG_MODE = os.getenv('FLASK_DEBUG', 'False').lower() == 'true' or os.getenv('FLASK_ENV') == 'development'
 
 # SECURITY IMPROVEMENT: Rate limiting
 limiter = Limiter(
@@ -34,10 +39,10 @@ jwt = JWTManager(app)
 
 # SECURITY IMPROVEMENT: More restrictive CORS
 allowed_origins = [
-    "https://wol.com",
-    "https://www.wol.com"
+    "https://rdv.embedados.com",
+    "https://www.rdv.embedados.com"
 ]
-if app.debug:
+if app.debug or DEBUG_MODE:
     allowed_origins.append("http://localhost:3000")
 
 CORS(app, origins=allowed_origins)
@@ -66,6 +71,56 @@ class ResponseSchema(Schema):
 class ResponsesSchema(Schema):
     responses = fields.List(fields.Nested(ResponseSchema), required=True, validate=lambda x: len(x) > 0)
 
+# Enhanced error handler for 500 errors
+@app.errorhandler(500)
+def handle_internal_error(e):
+    error_details = str(e)
+    
+    # If in debug mode, include full traceback
+    if DEBUG_MODE:
+        tb = traceback.format_exc()
+        logger.error(f"Internal error with traceback: {tb}")
+        
+        return jsonify({
+            'error': 'Erro interno do servidor',
+            'debug_info': {
+                'message': error_details,
+                'traceback': tb,
+                'type': type(e).__name__
+            }
+        }), 500
+    else:
+        logger.error(f"Internal error: {error_details}")
+        db.session.rollback()
+        return jsonify({'error': 'Erro interno do servidor'}), 500
+
+# Enhanced error handler for general exceptions
+@app.errorhandler(Exception)
+def handle_exception(e):
+    # Pass through HTTP errors
+    if isinstance(e, HTTPException):
+        return e
+    
+    error_details = str(e)
+    
+    if DEBUG_MODE:
+        tb = traceback.format_exc()
+        logger.error(f"Unhandled exception with traceback: {tb}")
+        
+        return jsonify({
+            'error': 'Erro interno do servidor',
+            'debug_info': {
+                'message': error_details,
+                'traceback': tb,
+                'type': type(e).__name__,
+                'args': str(e.args) if hasattr(e, 'args') else None
+            }
+        }), 500
+    else:
+        logger.error(f"Unhandled exception: {error_details}")
+        db.session.rollback()
+        return jsonify({'error': 'Erro interno do servidor'}), 500
+
 # IMPROVEMENT: Error handling
 @app.errorhandler(ValidationError)
 def handle_validation_error(e):
@@ -81,11 +136,34 @@ def handle_rate_limit(e):
     logger.warning(f"Rate limit exceeded: {request.remote_addr}")
     return jsonify({'error': 'Muitas tentativas. Tente novamente em alguns minutos.'}), 429
 
-@app.errorhandler(500)
-def handle_internal_error(e):
-    logger.error(f"Internal error: {str(e)}")
-    db.session.rollback()
-    return jsonify({'error': 'Erro interno do servidor'}), 500
+# Enhanced function wrapper for better error debugging
+def debug_api_call(func):
+    """Decorator to wrap API functions with detailed error handling"""
+    def wrapper(*args, **kwargs):
+        try:
+            return func(*args, **kwargs)
+        except Exception as e:
+            if DEBUG_MODE:
+                tb = traceback.format_exc()
+                logger.error(f"Error in {func.__name__}: {tb}")
+                
+                return jsonify({
+                    'error': f'Error in {func.__name__}',
+                    'debug_info': {
+                        'function': func.__name__,
+                        'message': str(e),
+                        'traceback': tb,
+                        'type': type(e).__name__,
+                        'args': list(args) if args else None,
+                        'kwargs': kwargs if kwargs else None
+                    }
+                }), 500
+            else:
+                logger.error(f"Error in {func.__name__}: {str(e)}")
+                raise
+    
+    wrapper.__name__ = func.__name__
+    return wrapper
 
 # Models
 class User(db.Model):
@@ -133,6 +211,7 @@ class Assessment(db.Model):
     started_at = db.Column(db.DateTime, default=datetime.utcnow)
     completed_at = db.Column(db.DateTime)
     user = db.relationship('User', backref='assessments')
+
 class Response(db.Model):
     __tablename__ = 'responses'
     id = db.Column(db.Integer, primary_key=True)
@@ -140,6 +219,7 @@ class Response(db.Model):
     question_id = db.Column(db.Integer, db.ForeignKey('questions.id'), nullable=False)
     score = db.Column(db.Integer, nullable=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     assessment = db.relationship('Assessment', backref='responses')
     question = db.relationship('Question', backref='responses')
 
@@ -187,103 +267,104 @@ class Action(db.Model):
     action_plan = db.relationship('ActionPlan', backref='actions')
 
 # Routes
-@app.route('/api/auth/register', methods=['POST'])
+@app.route('/api/debug/test-error')
+def debug_test_error():
+    """Test endpoint to verify error handling works"""
+    if DEBUG_MODE:
+        try:
+            # Intentionally cause an error
+            x = 1 / 0
+        except Exception as e:
+            tb = traceback.format_exc()
+            return jsonify({
+                'error': 'Test error',
+                'debug_info': {
+                    'message': str(e),
+                    'traceback': tb,
+                    'type': type(e).__name__
+                }
+            })
+    else:
+        return jsonify({'error': 'Debug mode disabled'}), 403
+
+@app.route('/api/register', methods=['POST'])
 @limiter.limit("5 per minute")
 def register():
     schema = UserRegistrationSchema()
-    
     try:
         data = schema.load(request.get_json() or {})
     except ValidationError as err:
         return jsonify({'error': 'Dados inválidos', 'details': err.messages}), 400
     
-    # Check if user exists
-    if User.query.filter_by(email=data['email'].lower().strip()).first():
-        logger.warning(f"Registration attempt with existing email: {data['email']}")
-        return jsonify({'error': 'Email já cadastrado'}), 409
+    # Check if user already exists
+    if User.query.filter_by(email=data['email']).first():
+        return jsonify({'error': 'Email já está em uso'}), 409
+    
+    # Hash password
+    password_hash = bcrypt.hashpw(data['password'].encode('utf-8'), bcrypt.gensalt())
+    
+    # Create user
+    user = User(
+        name=data['name'].strip(),
+        email=data['email'].lower(),
+        password_hash=password_hash
+    )
     
     try:
-        # SECURITY IMPROVEMENT: Strong password hashing with bcrypt
-        password_hash = bcrypt.hashpw(data['password'].encode('utf-8'), bcrypt.gensalt(rounds=12))
-        
-        user = User(
-            email=data['email'].lower().strip(),
-            password_hash=password_hash.decode('utf-8'),
-            name=data['name'].strip()
-        )
-        
         db.session.add(user)
         db.session.commit()
         
-        logger.info(f"New user registered: {user.email}")
+        # Create access token
+        access_token = create_access_token(identity=user.id)
         
-        access_token = create_access_token(identity=str(user.id))
         return jsonify({
             'access_token': access_token,
             'user': {
                 'id': user.id,
-                'email': user.email,
-                'name': user.name
+                'name': user.name,
+                'email': user.email
             }
         }), 201
         
-    except Exception as e:
+    except sqlalchemy.exc.IntegrityError:
         db.session.rollback()
-        logger.error(f"Registration failed for {data['email']}: {str(e)}")
-        return jsonify({'error': 'Falha no cadastro. Tente novamente.'}), 500
+        return jsonify({'error': 'Email já está em uso'}), 409
 
-@app.route('/api/auth/login', methods=['POST'])
+@app.route('/api/login', methods=['POST'])
 @limiter.limit("10 per minute")
 def login():
     schema = UserLoginSchema()
-    
     try:
         data = schema.load(request.get_json() or {})
     except ValidationError as err:
         return jsonify({'error': 'Dados inválidos', 'details': err.messages}), 400
     
-    user = User.query.filter_by(email=data['email'].lower().strip()).first()
+    user = User.query.filter_by(email=data['email'].lower()).first()
     
-    # SECURITY IMPROVEMENT: Use bcrypt for password verification
-    if user and bcrypt.checkpw(data['password'].encode('utf-8'), user.password_hash.encode('utf-8')):
-        access_token = create_access_token(identity=str(user.id))
-        logger.info(f"Successful login: {user.email}")
+    if user and bcrypt.checkpw(data['password'].encode('utf-8'), user.password_hash):
+        access_token = create_access_token(identity=user.id)
         return jsonify({
             'access_token': access_token,
             'user': {
                 'id': user.id,
-                'email': user.email,
-                'name': user.name
+                'name': user.name,
+                'email': user.email
             }
         })
     
-    logger.warning(f"Failed login attempt for: {data['email']}")
-    return jsonify({'error': 'Email ou senha incorretos'}), 401
+    return jsonify({'error': 'Credenciais inválidas'}), 401
 
 @app.route('/api/life-areas', methods=['GET'])
 def get_life_areas():
     areas = LifeArea.query.order_by(LifeArea.display_order).all()
-
-    # This new structure will include the subcategories for each area
-    result = []
-    for area in areas:
-        area_data = {
-            'id': area.id,
-            'name': area.name,
-            'description': area.description,
-            'color': area.color,
-            'icon': area.icon,
-            'display_order': area.display_order,
-            'subcategories': [{
-                'id': sub.id,
-                'name': sub.name,
-                'description': sub.description,
-                'display_order': sub.display_order
-            } for sub in area.subcategories]
-        }
-        result.append(area_data)
-
-    return jsonify(result)
+    return jsonify([{
+        'id': area.id,
+        'name': area.name,
+        'description': area.description,
+        'color': area.color,
+        'icon': area.icon,
+        'display_order': area.display_order
+    } for area in areas])
 
 @app.route('/api/life-areas/<int:area_id>/subcategories', methods=['GET'])
 def get_area_subcategories(area_id):
@@ -339,58 +420,15 @@ def get_user_assessments():
             'area_scores': area_scores
         })
     
-    return jsonify({'assessments': assessment_list})
+    return jsonify(assessment_list)
 
-@app.route('/api/assessments/<int:assessment_id>/progress', methods=['GET'])
+@app.route('/api/assessments/start', methods=['POST'])
 @jwt_required()
-def get_assessment_progress(assessment_id):
-    user_id = get_jwt_identity()
-    
-    assessment = Assessment.query.filter_by(id=assessment_id, user_id=user_id).first()
-    if not assessment:
-        return jsonify({'error': 'Avaliação não encontrada'}), 404
-    
-    # Get all answered questions
-    responses = Response.query.filter_by(assessment_id=assessment_id).all()
-    answered_questions = {r.question_id: r.score for r in responses}
-    
-    return jsonify({
-        'assessment': {
-            'id': assessment.id,
-            'status': assessment.status,
-            'current_area_index': assessment.current_area_index,
-            'started_at': assessment.started_at.isoformat(),
-        },
-        'answered_questions': answered_questions
-    })
-
-@app.route('/api/assessments/<int:assessment_id>/update-progress', methods=['POST'])
-@jwt_required()
-def update_assessment_progress(assessment_id):
-    user_id = get_jwt_identity()
-    data = request.get_json()
-    
-    assessment = Assessment.query.filter_by(id=assessment_id, user_id=user_id).first()
-    if not assessment:
-        return jsonify({'error': 'Avaliação não encontrada'}), 404
-    
-    if 'current_area_index' in data:
-        assessment.current_area_index = data['current_area_index']
-        db.session.commit()
-    
-    return jsonify({'message': 'Progresso atualizado'})
-
-@app.route('/api/assessments/continue-or-create', methods=['POST'])
-@jwt_required()
-def continue_or_create_assessment():
+def start_assessment():
     user_id = get_jwt_identity()
     
     # Check for in-progress assessment
-    in_progress = Assessment.query.filter_by(
-        user_id=user_id, 
-        status='in_progress'
-    ).order_by(Assessment.started_at.desc()).first()
-    
+    in_progress = Assessment.query.filter_by(user_id=user_id, status='in_progress').first()
     if in_progress:
         return jsonify({
             'id': in_progress.id,
@@ -497,7 +535,7 @@ def save_responses(assessment_id):
         db.session.rollback()  # Rollback on any error
         logger.error(f"Failed to save responses for assessment {assessment_id}: {str(e)}", exc_info=True)
         return jsonify({'error': 'Falha ao salvar respostas. Tente novamente.'}), 500
-    
+
 @app.route('/api/assessments/<int:assessment_id>/calculate', methods=['POST'])
 @jwt_required()
 def calculate_scores(assessment_id):
@@ -688,4 +726,4 @@ def create_action_plan(assessment_id):
 if __name__ == '__main__':
     with app.app_context():
         db.create_all()
-    app.run(debug=True)
+    app.run(debug=DEBUG_MODE)
