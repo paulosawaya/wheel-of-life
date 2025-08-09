@@ -175,14 +175,26 @@ const ActionPlanPage = () => {
   const [lifeAreas, setLifeAreas] = useState([]);
   const [selectedArea, setSelectedArea] = useState('');
   const [results, setResults] = useState([]);
-  const [isLoading, setIsLoading] = useState(true); // Add loading state
+  const [isLoading, setIsLoading] = useState(true);
+  const [points, setPoints] = useState({});
+  const [actionPlan, setActionPlan] = useState(null);
 
   useEffect(() => {
     loadData();
+    loadActionPlan();
   }, [id]);
 
+  const loadActionPlan = async () => {
+    try {
+      const response = await api.get(`/assessments/${id}/action-plan`);
+      setActionPlan(response.data);
+    } catch (error) {
+      // No action plan exists yet, which is fine.
+    }
+  };
+
   const loadData = async () => {
-    setIsLoading(true); // Start loading
+    setIsLoading(true);
     try {
       const [areasResponse, resultsResponse] = await Promise.all([
         api.get('/life-areas'),
@@ -190,14 +202,28 @@ const ActionPlanPage = () => {
       ]);
       
       setLifeAreas(areasResponse.data);
-      // Ensure results is always an array
       setResults(resultsResponse.data.area_results || []);
+
+      // Initialize points
+      const initialPoints = {};
+      areasResponse.data.forEach(area => {
+        initialPoints[area.id] = 0;
+      });
+      setPoints(initialPoints);
+
     } catch (error) {
       toast.error('Erro ao carregar dados');
-      setResults([]); // Set to empty array on error
+      setResults([]);
     } finally {
-      setIsLoading(false); // Stop loading
+      setIsLoading(false);
     }
+  };
+
+  const handlePointChange = (areaId, value) => {
+    setPoints(prevPoints => ({
+      ...prevPoints,
+      [areaId]: parseInt(value, 10)
+    }));
   };
 
   const handleAreaSelect = () => {
@@ -206,6 +232,10 @@ const ActionPlanPage = () => {
       return;
     }
     setStep(2);
+  };
+
+  const handleActionsSubmit = () => {
+    setStep(3);
   };
 
   const onSubmit = async (data) => {
@@ -232,10 +262,16 @@ const ActionPlanPage = () => {
       return;
     }
 
+    const pointsData = Object.keys(points).map(areaId => ({
+      life_area_id: parseInt(areaId),
+      points: points[areaId]
+    }));
+
     try {
       await api.post(`/assessments/${id}/action-plan`, {
         focus_area_id: parseInt(selectedArea),
-        actions
+        actions,
+        points: pointsData
       });
 
       toast.success('Plano de ação criado com sucesso!');
@@ -251,6 +287,38 @@ const ActionPlanPage = () => {
     color: result.color,
     percentage: result.percentage
   }));
+
+  if (actionPlan) {
+    return (
+      <Container>
+        <Header>
+          <h1>Plano de Ação</h1>
+        </Header>
+        <ContentCard>
+          <StepTitle>Plano de Ação Existente</StepTitle>
+          <StepDescription>
+            Este é o plano de ação que você já criou para esta avaliação.
+          </StepDescription>
+
+          <h2>Ações</h2>
+          {actionPlan.actions.map((action, index) => (
+            <ActionGroup key={index}>
+              <p><strong>Ação:</strong> {action.action_text}</p>
+              <p><strong>Estratégia:</strong> {action.strategy_text}</p>
+              <p><strong>Data Alvo:</strong> {action.target_date}</p>
+            </ActionGroup>
+          ))}
+
+          <h2>Contribuição de Pontos</h2>
+          {actionPlan.points.map((point, index) => (
+            <div key={index}>
+              <p><strong>{lifeAreas.find(a => a.id === point.life_area_id)?.name}:</strong> {point.points} pontos</p>
+            </div>
+          ))}
+        </ContentCard>
+      </Container>
+    );
+  }
 
   if (isLoading) {
     return (
@@ -314,6 +382,41 @@ const ActionPlanPage = () => {
     );
   }
 
+  if (step === 3) {
+    return (
+      <Container>
+        <Header>
+          <h1>RODA DA VIDA</h1>
+          <p>Distribua os pontos de contribuição</p>
+        </Header>
+
+        <ContentCard>
+          <StepTitle>Contribuição do Plano de Ação</StepTitle>
+          <StepDescription>
+            Distribua 100 pontos entre as áreas da sua vida, de acordo com o impacto que seu plano de ação terá em cada uma delas.
+          </StepDescription>
+
+          {lifeAreas.map(area => (
+            <div key={area.id}>
+              <label>{area.name}: {points[area.id]}</label>
+              <input
+                type="range"
+                min="0"
+                max="100"
+                value={points[area.id]}
+                onChange={(e) => handlePointChange(area.id, e.target.value)}
+              />
+            </div>
+          ))}
+
+          <SubmitButton type="button" onClick={handleSubmit(onSubmit)}>
+            FINALIZAR PLANO DE AÇÃO >>
+          </SubmitButton>
+        </ContentCard>
+      </Container>
+    );
+  }
+
   return (
     <Container>
       <Header>
@@ -328,7 +431,7 @@ const ActionPlanPage = () => {
             data de início da ação e a estratégia para colocá-la em prática:
           </StepDescription>
 
-          <ActionForm onSubmit={handleSubmit(onSubmit)}>
+          <ActionForm onSubmit={handleSubmit(handleActionsSubmit)}>
             {[1, 2, 3].map(num => (
               <ActionGroup key={num}>
                 <InputGroup>
@@ -349,7 +452,7 @@ const ActionPlanPage = () => {
             ))}
 
             <SubmitButton type="submit">
-              QUERO RECEBER MEU PLANO DE AÇÃO >>
+              CONTINUAR >>
             </SubmitButton>
           </ActionForm>
         </StepContainer>

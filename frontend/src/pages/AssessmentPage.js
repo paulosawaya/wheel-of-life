@@ -265,7 +265,21 @@ const AssessmentPage = () => {
 
   useEffect(() => {
     loadAssessmentData();
+    loadLastAssessment();
   }, []);
+
+  const loadLastAssessment = async () => {
+    try {
+      const response = await api.get('/user/last-assessment');
+      if (response.data && response.data.responses) {
+        setResponses(response.data.responses);
+        toast.success('Respostas da última avaliação carregadas.');
+      }
+    } catch (error) {
+      // It's okay if there's no last assessment, so we don't show an error toast.
+      console.log("Nenhuma avaliação anterior encontrada.");
+    }
+  };
 
 useEffect(() => {
   if (lifeAreas.length > 0) {

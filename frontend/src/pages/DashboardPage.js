@@ -45,8 +45,14 @@ const AssessmentCard = styled.div`
   border-radius: 15px;
   padding: 2rem;
   box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
-  transition: transform 0.3s, box-shadow 0.3s;
+  transition: transform 0.3s, box-shadow 0.3s, border 0.3s;
   cursor: pointer;
+  border: 2px solid transparent;
+
+  ${props => props.isLast && `
+    border: 2px solid #4ECDC4;
+    box-shadow: 0 15px 40px rgba(78, 205, 196, 0.2);
+  `}
 
   &:hover {
     transform: translateY(-5px);
@@ -251,10 +257,11 @@ const DashboardPage = () => {
 
       <Content>
         <AssessmentGrid>
-          {assessments.map(assessment => (
+          {assessments.map((assessment, index) => (
             <AssessmentCard 
               key={assessment.id}
               onClick={() => handleAssessmentClick(assessment)}
+              isLast={index === 0}
             >
               <StatusBadge status={assessment.status}>
                 {assessment.status === 'completed' ? 'Completa' : 'Em Progresso'}

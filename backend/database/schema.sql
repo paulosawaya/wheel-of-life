@@ -114,6 +114,17 @@ CREATE TABLE actions (
     FOREIGN KEY (action_plan_id) REFERENCES action_plans(id) ON DELETE CASCADE
 );
 
+-- Points contributed by an action plan to each life area
+CREATE TABLE action_plan_points (
+    id INT PRIMARY KEY AUTO_INCREMENT,
+    action_plan_id INT NOT NULL,
+    life_area_id INT NOT NULL,
+    points INT NOT NULL,
+    FOREIGN KEY (action_plan_id) REFERENCES action_plans(id) ON DELETE CASCADE,
+    FOREIGN KEY (life_area_id) REFERENCES life_areas(id) ON DELETE CASCADE,
+    UNIQUE KEY unique_action_plan_area (action_plan_id, life_area_id)
+);
+
 -- Insert life areas
 INSERT INTO life_areas (name, description, color, icon, display_order) VALUES
 ('Pessoal', 'Desenvolvimento pessoal, saúde e equilíbrio emocional', '#FF6B6B', 'user', 1),

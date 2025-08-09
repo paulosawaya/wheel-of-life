@@ -266,6 +266,15 @@ class Action(db.Model):
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     action_plan = db.relationship('ActionPlan', backref='actions')
 
+class ActionPlanPoints(db.Model):
+    __tablename__ = 'action_plan_points'
+    id = db.Column(db.Integer, primary_key=True)
+    action_plan_id = db.Column(db.Integer, db.ForeignKey('action_plans.id'), nullable=False)
+    life_area_id = db.Column(db.Integer, db.ForeignKey('life_areas.id'), nullable=False)
+    points = db.Column(db.Integer, nullable=False)
+    action_plan = db.relationship('ActionPlan', backref='points')
+    life_area = db.relationship('LifeArea', backref='points')
+
 # Routes
 @app.route('/api/debug/test-error')
 def debug_test_error():
@@ -421,6 +430,26 @@ def get_user_assessments():
         })
     
     return jsonify(assessment_list)
+
+@app.route('/api/user/last-assessment', methods=['GET'])
+@jwt_required()
+def get_last_assessment():
+    user_id = get_jwt_identity()
+    last_assessment = Assessment.query.filter_by(
+        user_id=user_id,
+        status='completed'
+    ).order_by(Assessment.completed_at.desc()).first()
+
+    if not last_assessment:
+        return jsonify({'message': 'Nenhuma avaliação completa encontrada'}), 404
+
+    responses = Response.query.filter_by(assessment_id=last_assessment.id).all()
+    response_data = {r.question_id: r.score for r in responses}
+
+    return jsonify({
+        'assessment_id': last_assessment.id,
+        'responses': response_data
+    })
 
 @app.route('/api/assessments/start', methods=['POST'])
 @jwt_required()
@@ -715,6 +744,15 @@ def create_action_plan(assessment_id):
             target_date=datetime.strptime(action_data['target_date'], '%Y-%m-%d').date() if action_data.get('target_date') else None
         )
         db.session.add(action)
+
+    # Add points
+    for points_data in data['points']:
+        points = ActionPlanPoints(
+            action_plan_id=action_plan.id,
+            life_area_id=points_data['life_area_id'],
+            points=points_data['points']
+        )
+        db.session.add(points)
     
     db.session.commit()
     
@@ -722,6 +760,37 @@ def create_action_plan(assessment_id):
         'id': action_plan.id,
         'message': 'Plano de ação criado com sucesso'
     }), 201
+
+@app.route('/api/assessments/<int:assessment_id>/action-plan', methods=['GET'])
+@jwt_required()
+def get_action_plan(assessment_id):
+    user_id = get_jwt_identity()
+
+    assessment = Assessment.query.filter_by(id=assessment_id, user_id=user_id).first()
+    if not assessment:
+        return jsonify({'message': 'Assessment não encontrado'}), 404
+
+    action_plan = ActionPlan.query.filter_by(assessment_id=assessment_id).first()
+    if not action_plan:
+        return jsonify({'message': 'Plano de ação não encontrado'}), 404
+
+    actions = Action.query.filter_by(action_plan_id=action_plan.id).all()
+    points = ActionPlanPoints.query.filter_by(action_plan_id=action_plan.id).all()
+
+    return jsonify({
+        'id': action_plan.id,
+        'focus_area_id': action_plan.focus_area_id,
+        'actions': [{
+            'action_text': a.action_text,
+            'strategy_text': a.strategy_text,
+            'target_date': a.target_date.isoformat() if a.target_date else None,
+            'status': a.status
+        } for a in actions],
+        'points': [{
+            'life_area_id': p.life_area_id,
+            'points': p.points
+        } for p in points]
+    })
 
 if __name__ == '__main__':
     with app.app_context():
