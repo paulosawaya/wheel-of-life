@@ -114,6 +114,22 @@ CREATE TABLE actions (
     FOREIGN KEY (action_plan_id) REFERENCES action_plans(id) ON DELETE CASCADE
 );
 
+-- Contribution points for action plans
+CREATE TABLE action_contribution_points (
+    id INT PRIMARY KEY AUTO_INCREMENT,
+    action_plan_id INT NOT NULL,
+    life_area_id INT NOT NULL,
+    contribution_points INT NOT NULL DEFAULT 0 CHECK (contribution_points >= 0 AND contribution_points <= 100),
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    FOREIGN KEY (action_plan_id) REFERENCES action_plans(id) ON DELETE CASCADE,
+    FOREIGN KEY (life_area_id) REFERENCES life_areas(id) ON DELETE CASCADE,
+    UNIQUE KEY unique_contribution (action_plan_id, life_area_id)
+);
+
+-- Add index for better query performance
+CREATE INDEX idx_action_plan_contribution ON action_contribution_points(action_plan_id);
+CREATE INDEX idx_assessment_user ON assessments(user_id, completed_at DESC);
 -- Insert life areas
 INSERT INTO life_areas (name, description, color, icon, display_order) VALUES
 ('Pessoal', 'Desenvolvimento pessoal, saúde e equilíbrio emocional', '#FF6B6B', 'user', 1),

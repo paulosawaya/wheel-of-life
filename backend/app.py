@@ -185,6 +185,17 @@ class Action(db.Model):
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     action_plan = db.relationship('ActionPlan', backref='actions')
 
+class ActionContributionPoint(db.Model):
+    __tablename__ = 'action_contribution_points'
+    id = db.Column(db.Integer, primary_key=True)
+    action_plan_id = db.Column(db.Integer, db.ForeignKey('action_plans.id'), nullable=False)
+    life_area_id = db.Column(db.Integer, db.ForeignKey('life_areas.id'), nullable=False)
+    contribution_points = db.Column(db.Integer, nullable=False, default=0)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    action_plan = db.relationship('ActionPlan', backref='contribution_points')
+    life_area = db.relationship('LifeArea', backref='contribution_points')
+
 # Routes
 @app.route('/api/auth/register', methods=['POST'])
 @limiter.limit("5 per minute")
@@ -677,3 +688,172 @@ if __name__ == '__main__':
     with app.app_context():
         db.create_all()
     app.run(debug=True)
+
+@app.route('/api/user/last-assessment', methods=['GET'])
+@jwt_required()
+def get_last_assessment():
+    """Get the last completed assessment for the current user"""
+    user_id = get_jwt_identity()
+    
+    # Get the most recent completed assessment
+    last_assessment = Assessment.query.filter_by(
+        user_id=user_id,
+        status='completed'
+    ).order_by(Assessment.completed_at.desc()).first()
+    
+    if not last_assessment:
+        return jsonify({'message': 'No previous assessment found'}), 404
+    
+    # Get all responses for this assessment
+    responses = Response.query.filter_by(assessment_id=last_assessment.id).all()
+    
+    # Format responses by question_id
+    response_data = {
+        response.question_id: response.score 
+        for response in responses
+    }
+    
+    return jsonify({
+        'assessment_id': last_assessment.id,
+        'completed_at': last_assessment.completed_at.isoformat(),
+        'responses': response_data
+    })
+
+@app.route('/api/assessments/<int:assessment_id>/action-plan', methods=['GET'])
+@jwt_required()
+def get_action_plan(assessment_id):
+    """Get action plan for a specific assessment"""
+    user_id = get_jwt_identity()
+    
+    # Verify assessment ownership
+    assessment = Assessment.query.filter_by(id=assessment_id, user_id=user_id).first()
+    if not assessment:
+        return jsonify({'message': 'Assessment not found'}), 404
+    
+    # Get action plan
+    action_plan = ActionPlan.query.filter_by(assessment_id=assessment_id).first()
+    if not action_plan:
+        return jsonify({'message': 'No action plan found'}), 404
+    
+    # Get actions
+    actions = Action.query.filter_by(action_plan_id=action_plan.id).all()
+    
+    # Get contribution points
+    contribution_points = ActionContributionPoint.query.filter_by(
+        action_plan_id=action_plan.id
+    ).all()
+    
+    return jsonify({
+        'id': action_plan.id,
+        'assessment_id': action_plan.assessment_id,
+        'focus_area_id': action_plan.focus_area_id,
+        'created_at': action_plan.created_at.isoformat(),
+        'actions': [{
+            'id': action.id,
+            'action_text': action.action_text,
+            'strategy_text': action.strategy_text,
+            'target_date': action.target_date.isoformat() if action.target_date else None,
+            'status': action.status
+        } for action in actions],
+        'contribution_points': [{
+            'life_area_id': cp.life_area_id,
+            'points': cp.contribution_points
+        } for cp in contribution_points],
+        'is_editable': False  # Past action plans are not editable
+    })
+
+@app.route('/api/assessments/<int:assessment_id>/action-plan', methods=['POST'])
+@jwt_required()
+def create_or_update_action_plan(assessment_id):
+    """Create or update action plan with contribution points"""
+    user_id = get_jwt_identity()
+    data = request.get_json()
+    
+    # Verify assessment ownership
+    assessment = Assessment.query.filter_by(id=assessment_id, user_id=user_id).first()
+    if not assessment:
+        return jsonify({'message': 'Assessment not found'}), 404
+    
+    # Check if action plan already exists
+    existing_plan = ActionPlan.query.filter_by(assessment_id=assessment_id).first()
+    if existing_plan:
+        return jsonify({'message': 'Action plan already exists for this assessment', 'is_editable': False}), 400
+    
+    # Validate contribution points sum to 100
+    contribution_points = data.get('contribution_points', [])
+    total_points = sum(cp.get('points', 0) for cp in contribution_points)
+    if total_points != 100:
+        return jsonify({'message': f'Contribution points must sum to 100, got {total_points}'}), 400
+    
+    # Create action plan
+    action_plan = ActionPlan(
+        assessment_id=assessment_id,
+        focus_area_id=data['focus_area_id']
+    )
+    db.session.add(action_plan)
+    db.session.flush()
+    
+    # Add contribution points
+    for cp_data in contribution_points:
+        contribution_point = ActionContributionPoint(
+            action_plan_id=action_plan.id,
+            life_area_id=cp_data['life_area_id'],
+            contribution_points=cp_data['points']
+        )
+        db.session.add(contribution_point)
+    
+    # Add actions
+    for action_data in data.get('actions', []):
+        action = Action(
+            action_plan_id=action_plan.id,
+            action_text=action_data['action_text'],
+            strategy_text=action_data['strategy_text'],
+            target_date=datetime.strptime(action_data['target_date'], '%Y-%m-%d').date() if action_data.get('target_date') else None
+        )
+        db.session.add(action)
+    
+    db.session.commit()
+    
+    return jsonify({
+        'id': action_plan.id,
+        'message': 'Action plan created successfully'
+    }), 201
+
+@app.route('/api/user/assessments', methods=['GET'])
+@jwt_required()
+def get_user_assessments():
+    """Get all assessments for the current user with area scores"""
+    user_id = get_jwt_identity()
+    
+    assessments = Assessment.query.filter_by(user_id=user_id).order_by(Assessment.started_at.desc()).all()
+    
+    result = []
+    for assessment in assessments:
+        # Get area scores if assessment is completed
+        area_scores = []
+        if assessment.status == 'completed':
+            scores = db.session.query(
+                AreaScore,
+                LifeArea
+            ).join(
+                LifeArea, AreaScore.life_area_id == LifeArea.id
+            ).filter(
+                AreaScore.assessment_id == assessment.id
+            ).all()
+            
+            area_scores = [{
+                'area_name': area.name,
+                'score': float(score.average_score)
+            } for score, area in scores]
+        
+        result.append({
+            'id': assessment.id,
+            'title': assessment.title,
+            'status': assessment.status,
+            'current_area_index': assessment.current_area_index,
+            'started_at': assessment.started_at.isoformat(),
+            'completed_at': assessment.completed_at.isoformat() if assessment.completed_at else None,
+            'area_scores': area_scores
+        })
+    
+    return jsonify({'assessments': result})

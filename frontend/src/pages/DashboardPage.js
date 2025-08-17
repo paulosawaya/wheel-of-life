@@ -47,6 +47,25 @@ const AssessmentCard = styled.div`
   box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
   transition: transform 0.3s, box-shadow 0.3s;
   cursor: pointer;
+  position: relative;
+  
+  ${props => props.isLatest && `
+    border: 3px solid #FFD700;
+    background: linear-gradient(135deg, #fff 0%, #fffef0 100%);
+    
+    &::before {
+      content: '⭐ Última Avaliação';
+      position: absolute;
+      top: -12px;
+      right: 20px;
+      background: #FFD700;
+      color: #333;
+      padding: 0.3rem 0.8rem;
+      border-radius: 20px;
+      font-size: 0.8rem;
+      font-weight: bold;
+    }
+  `}
 
   &:hover {
     transform: translateY(-5px);
@@ -153,6 +172,10 @@ const NewAssessmentCard = styled(AssessmentCard)`
   &:hover {
     background: rgba(78, 205, 196, 0.1);
   }
+  
+  &::before {
+    display: none;
+  }
 `;
 
 const PlusIcon = styled.div`
@@ -232,6 +255,20 @@ const DashboardPage = () => {
     navigate('/compare-assessments', { state: { assessments: completedAssessments } });
   };
 
+  // Find the most recent completed assessment
+  const getLatestCompletedAssessment = () => {
+    const completed = assessments.filter(a => a.status === 'completed');
+    if (completed.length === 0) return null;
+    
+    return completed.reduce((latest, current) => {
+      const latestDate = new Date(latest.completed_at || latest.started_at);
+      const currentDate = new Date(current.completed_at || current.started_at);
+      return currentDate > latestDate ? current : latest;
+    });
+  };
+
+  const latestAssessment = getLatestCompletedAssessment();
+
   if (loading) {
     return (
       <Container>
@@ -255,6 +292,7 @@ const DashboardPage = () => {
             <AssessmentCard 
               key={assessment.id}
               onClick={() => handleAssessmentClick(assessment)}
+              isLatest={latestAssessment && latestAssessment.id === assessment.id}
             >
               <StatusBadge status={assessment.status}>
                 {assessment.status === 'completed' ? 'Completa' : 'Em Progresso'}
@@ -283,7 +321,7 @@ const DashboardPage = () => {
                 </>
               )}
               
-              {assessment.status === 'completed' && assessment.area_scores.length > 0 && (
+              {assessment.status === 'completed' && assessment.area_scores && assessment.area_scores.length > 0 && (
                 <ScoresList>
                   {assessment.area_scores.slice(0, 3).map((score, index) => (
                     <ScoreItem key={index}>
