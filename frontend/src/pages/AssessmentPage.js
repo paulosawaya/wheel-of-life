@@ -471,32 +471,12 @@ const AssessmentPage = () => {
           </div>
         ))}
 
-<<<<<<< HEAD
-                      {subcategoryQuestions.map(question => (
-                        <QuestionContainer key={question.id}>
-                          <QuestionText>{question.question_text}</QuestionText>
-                          <ScoreInput
-                            type="number"
-                            min="0"
-                            max="10"
-                            value={responses[question.id] || ''}
-                            onChange={(e) => handleScoreChange(question.id, e.target.value)}
-                            aria-label={`Score for ${question.question_text}`}
-                          />
-                        </QuestionContainer>
-
-                      ))}
-                    </div>
-                  );
-              })}
-=======
         {isAreaComplete() && (
           <ScoreSummary>
             <h4>Média desta área: {calculateAreaAverage().toFixed(1)}/10</h4>
             <p>Todas as perguntas foram respondidas</p>
           </ScoreSummary>
         )}
->>>>>>> 5e2e3012478523a775f8092a5f2f7255a3922d66
 
         {showWheel && (
           <WheelContainer>
