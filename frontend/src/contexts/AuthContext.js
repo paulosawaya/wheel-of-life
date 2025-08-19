@@ -71,7 +71,7 @@ export const AuthProvider = ({ children }) => {
     localStorage.removeItem('token');
     setUser(null); // Clear the user state
     // Redirect to login page to ensure a clean state
-    window.location.href = '/login';
+    window.location.href = '/auth/login';
   };
 
   const value = {

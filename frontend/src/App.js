@@ -3,6 +3,7 @@ import React from 'react';
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import { Toaster } from 'react-hot-toast';
 import { AuthProvider } from './contexts/AuthContext';
+import Layout from './components/Layout';
 import HomePage from './pages/HomePage';
 import AssessmentPage from './pages/AssessmentPage';
 import ResultsPage from './pages/ResultsPage';
@@ -20,73 +21,75 @@ function App() {
     <ErrorBoundary>
       <AuthProvider>
         <Router>
-          <div className="App">
-            <Toaster 
-              position="top-right"
-              toastOptions={{
-                duration: 4000,
-                style: {
-                  background: '#363636',
-                  color: '#fff',
-                },
-                success: {
+          <Layout>
+            <div className="App">
+              <Toaster 
+                position="top-right"
+                toastOptions={{
+                  duration: 4000,
                   style: {
-                    background: '#4ECDC4',
+                    background: '#363636',
+                    color: '#fff',
                   },
-                },
-                error: {
-                  style: {
-                    background: '#e74c3c',
+                  success: {
+                    style: {
+                      background: '#4ECDC4',
+                    },
                   },
-                },
-              }}
-            />
-            <Routes>
-              <Route path="/login" element={<LoginPage />} />
-              <Route path="/register" element={<RegisterPage />} />
-              <Route path="/" element={<HomePage />} />
-              <Route 
-                path="/dashboard" 
-                element={
-                  <ProtectedRoute>
-                    <DashboardPage />
-                  </ProtectedRoute>
-                } 
+                  error: {
+                    style: {
+                      background: '#e74c3c',
+                    },
+                  },
+                }}
               />
-              <Route 
-                path="/assessment/:id" 
-                element={
-                  <ProtectedRoute>
-                    <AssessmentPage />
-                  </ProtectedRoute>
-                } 
-              />
-              <Route 
-                path="/results/:id" 
-                element={
-                  <ProtectedRoute>
-                    <ResultsPage />
-                  </ProtectedRoute>
-                } 
-              />
-              <Route 
-                path="/action-plan/:id" 
-                element={
-                  <ProtectedRoute>
-                    <ActionPlanPage />
-                  </ProtectedRoute>
-                } 
-              />
-              <Route 
-                path="/compare-assessments" 
-                element={
-                  <ProtectedRoute>
-                    <CompareAssessmentsPage />
-                  </ProtectedRoute>
-                } 
-              />
-            </Routes>
-          </div>
+              <Routes>
+                <Route path="/login" element={<LoginPage />} />
+                <Route path="/register" element={<RegisterPage />} />
+                <Route path="/" element={<HomePage />} />
+                <Route 
+                  path="/dashboard" 
+                  element={
+                    <ProtectedRoute>
+                      <DashboardPage />
+                    </ProtectedRoute>
+                  } 
+                />
+                <Route 
+                  path="/assessment/:id" 
+                  element={
+                    <ProtectedRoute>
+                      <AssessmentPage />
+                    </ProtectedRoute>
+                  } 
+                />
+                <Route 
+                  path="/results/:id" 
+                  element={
+                    <ProtectedRoute>
+                      <ResultsPage />
+                    </ProtectedRoute>
+                  } 
+                />
+                <Route 
+                  path="/action-plan/:id" 
+                  element={
+                    <ProtectedRoute>
+                      <ActionPlanPage />
+                    </ProtectedRoute>
+                  } 
+                />
+                <Route 
+                  path="/compare-assessments" 
+                  element={
+                    <ProtectedRoute>
+                      <CompareAssessmentsPage />
+                    </ProtectedRoute>
+                  } 
+                />
+              </Routes>
+            </div>
+          </Layout>
         </Router>
       </AuthProvider>
     </ErrorBoundary>
