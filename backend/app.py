@@ -389,7 +389,6 @@ class ActionContributionPoint(db.Model):
         return f'<ActionContributionPoint {self.action_plan_id}-{self.life_area_id}: {self.contribution_points}>'
 
 # Database connection testing
-@app.before_first_request
 def test_db_connection():
     try:
         db.session.execute(db.text('SELECT 1'))
@@ -397,6 +396,10 @@ def test_db_connection():
     except Exception as e:
         logger.error(f"Database connection failed: {e}")
         raise
+
+# Call database test on startup
+with app.app_context():
+    test_db_connection()
 
 # UTILITY FUNCTIONS
 
@@ -439,7 +442,7 @@ def debug_test_error():
     else:
         return jsonify({'error': 'Debug mode disabled'}), 403
 
-@app.route('/api/register', methods=['POST'])
+@app.route('/api/auth/register', methods=['POST'])
 @limiter.limit("5 per minute")
 def register():
     """User registration endpoint"""
@@ -493,7 +496,7 @@ def register():
         logger.error(f"Registration failed for {email}: {e}")
         return jsonify({'error': 'Erro ao criar usuário'}), 500
 
-@app.route('/api/login', methods=['POST'])
+@app.route('/api/auth/login', methods=['POST'])
 @limiter.limit("10 per minute")
 def login():
     """User login endpoint"""
